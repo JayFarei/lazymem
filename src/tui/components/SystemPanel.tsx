@@ -25,10 +25,11 @@ function ramColor(pct: number): string {
   return "#3fb950";
 }
 
-function procColor(mb: number): string {
-  if (mb > 2000) return "#f85149";
-  if (mb > 800)  return "#d29922";
-  if (mb > 200)  return "#c9d1d9";
+function procColor(mb: number, totalMB: number): string {
+  const pct = mb / Math.max(totalMB, 1);
+  if (pct > 0.025) return "#f85149";  // >2.5% of total RAM
+  if (pct > 0.010) return "#d29922";  // >1.0%
+  if (pct > 0.003) return "#c9d1d9";  // >0.3%
   return "#8b949e";
 }
 
@@ -52,10 +53,14 @@ export function SystemPanel(props: Props) {
     : props.panelWidth != null
       ? props.panelWidth
       : Math.max(20, Math.floor(dims().width / 3) - 4);
-  // RAM row: label(6)+pct(6)+bar+sp(2)+used/total(11) = 25+bar → bar = panelW-25
-  const memBarW  = () => Math.max(6, panelW() - 25);
-  // Proc row: name(13)+bar+mem(5) = 18+bar → bar = panelW-18
-  const procBarW = () => Math.max(4, panelW() - 18);
+  // Memory section columns (expanded: fixed bar so values align; minified: fill)
+  //   label(8) + gap(5) + bar + value(13)  → bar = panelW - 26, capped at 60
+  const memBarW  = () => props.expanded
+    ? Math.min(60, Math.max(8, panelW() - 26))
+    : Math.max(6, panelW() - 25);
+  // Proc section: name column wider in expanded, bar fills remaining space
+  const procNameW = () => props.expanded ? Math.min(20, Math.max(14, panelW() - 30)) : 11;
+  const procBarW  = () => Math.max(4, panelW() - procNameW() - 9);
 
   const sys       = () => props.data?.system;
   const totalMB   = () => Math.max(sys()?.totalMB ?? 1, 1);
@@ -79,15 +84,19 @@ export function SystemPanel(props: Props) {
     { pct: cachedMB() / totalMB(), fg: "#30363d" },
   ];
 
-  const swapUsedStr = () => sys()?.swap?.used  ?? "";
-  const swapTotStr  = () => sys()?.swap?.total ?? "";
-  const swapFreeStr = () => sys()?.swap?.free  ?? "";
-  // Swap pct from string values (e.g. "1.25G" / "3.00G")
-  const parseSwapG  = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
-  const swapPct     = () => {
-    const tot = parseSwapG(swapTotStr()); return tot > 0 ? parseSwapG(swapUsedStr()) / tot : 0;
+  // Parse raw sysctl swap string (e.g. "4528.25M", "6.00G") → MB
+  const parseSwapMB = (s: string): number => {
+    const n = parseFloat(s); if (isNaN(n)) return 0;
+    return s.toUpperCase().includes("G") ? n * 1024 : n;
   };
-  const hasSwap     = () => parseSwapG(swapTotStr()) > 0;
+  const swapUsedMB2 = () => parseSwapMB(sys()?.swap?.used  ?? "");
+  const swapTotMB2  = () => parseSwapMB(sys()?.swap?.total ?? "");
+  const swapPct     = () => swapTotMB2() > 0 ? swapUsedMB2() / swapTotMB2() : 0;
+  const hasSwap     = () => swapTotMB2() > 0;
+  const swapValStr  = () => `${fmtMB(swapUsedMB2())}/${fmtMB(swapTotMB2())}`;
+
+  // Right-aligned value column for memory rows in expanded mode (13 chars)
+  const memVal = (s: string) => props.expanded ? s.padStart(13) : "  " + s;
 
   const allProcs   = () => [...(props.data?.topProcs ?? [])]
     .filter(p => p.cmd.trim().length > 0)
@@ -127,55 +136,63 @@ export function SystemPanel(props: Props) {
         }
       >
         {/* ── Memory breakdown ────────────────────────── */}
+        {/* @opentui/solid drops the last child of any container (getNextSibling bug).
+            Workaround: use <Show> to completely hide breakdown rows when not expanded (avoids
+            the height=0 artifact where the last-before-sentinel row still renders its content).
+            Each level ends with a text-node sentinel (non-box nodes aren't pruned by the layout
+            engine's zero-height optimization, so they reliably absorb the drop). */}
         <box flexDirection="column" marginTop={1}>
           {/* RAM row — always visible */}
           <box flexDirection="row" height={1}>
-            <text fg={titleColor()}>{"RAM ".padEnd(6)}</text>
-            <text fg={ramColor(usedPct())}>{ramPctStr().padStart(4)}  </text>
+            <text fg={titleColor()}>{"RAM".padEnd(8)}</text>
+            <text fg={ramColor(usedPct())}>{ramPctStr().padStart(4) + " "}</text>
             <SegmentedBar segments={ramSegments()} width={memBarW()} emptyFg="#21262d" />
-            <text fg="#8b949e">  {fmtMB(usedMB())}/{fmtMB(totalMB())} </text>
+            <text fg="#8b949e">{memVal(fmtMB(usedMB()) + "/" + fmtMB(totalMB()))}</text>
           </box>
-          {/* Breakdown rows — magnified only */}
+          {/* Breakdown rows — expanded only.
+              All 6 rows are static BaseRenderables in a single column.
+              Swap uses reactive height prop (no SlotRenderable injected as sibling).
+              Text-node sentinel at end: text nodes survive the layout engine's pruning,
+              ensuring the preceding sibling (swap) is not the effective "last" child.
+              Accepts 1 blank sentinel line after the breakdown rows. */}
           <Show when={props.expanded}>
-            <box flexDirection="row" height={1}>
-              <text fg="#4d5566">{"app".padEnd(6)}</text>
-              <text fg="#8b949e">{"".padStart(6)}</text>
-              <AnimatedBar pct={appPct()} width={memBarW()} fg="#58a6ff" emptyFg="#21262d" />
-              <text fg="#4d5566">  {fmtMB(appMB())}</text>
-            </box>
-            <box flexDirection="row" height={1}>
-              <text fg="#4d5566">{"wired".padEnd(6)}</text>
-              <text fg="#8b949e">{"".padStart(6)}</text>
-              <AnimatedBar pct={wiredPct()} width={memBarW()} fg="#4d5566" emptyFg="#21262d" />
-              <text fg="#4d5566">  {fmtMB(wiredMB())}</text>
-            </box>
-            <box flexDirection="row" height={1}>
-              <text fg="#4d5566">{"comp".padEnd(6)}</text>
-              <text fg="#8b949e">{"".padStart(6)}</text>
-              <AnimatedBar pct={compPct()} width={memBarW()} fg="#4d5566" emptyFg="#21262d" />
-              <text fg="#4d5566">  {fmtMB(compMB())}</text>
-            </box>
-            <box flexDirection="row" height={1}>
-              <text fg="#4d5566">{"cached".padEnd(6)}</text>
-              <text fg="#8b949e">{"".padStart(6)}</text>
-              <AnimatedBar pct={cachedPct()} width={memBarW()} fg="#2d333b" emptyFg="#21262d" />
-              <text fg="#4d5566">  {fmtMB(cachedMB())}</text>
-            </box>
-            <Show when={hasSwap()}>
+            <box flexDirection="column">
               <box flexDirection="row" height={1}>
-                <text fg={swapPct() > 0.5 ? "#d29922" : "#4d5566"}>{"swap".padEnd(6)}</text>
-                <text fg="#8b949e">{"".padStart(6)}</text>
-                <AnimatedBar pct={swapPct()} width={memBarW()} fg={swapPct() > 0.5 ? "#d29922" : "#4d5566"} emptyFg="#21262d" />
-                <text fg={swapPct() > 0.5 ? "#d29922" : "#4d5566"}>  {swapUsedStr()}/{swapTotStr()}</text>
+                <text fg="#4d5566">{"  app".padEnd(8)}</text><text fg="#4d5566">{"     "}</text>
+                <AnimatedBar pct={appPct()} width={memBarW()} fg="#58a6ff" emptyFg="#21262d" />
+                <text fg="#4d5566">{memVal(fmtMB(appMB()))}</text>
               </box>
-            </Show>
-            <box flexDirection="row" height={1}>
-              <text fg="#4d5566">{"free".padEnd(6)}</text>
-              <text fg="#8b949e">{"".padStart(6)}</text>
-              <AnimatedBar pct={freeMB() / totalMB()} width={memBarW()} fg="#2d333b" emptyFg="#21262d" />
-              <text fg="#4d5566">  {fmtMB(freeMB())}</text>
+              <box flexDirection="row" height={1}>
+                <text fg="#4d5566">{"  wired".padEnd(8)}</text><text fg="#4d5566">{"     "}</text>
+                <AnimatedBar pct={wiredPct()} width={memBarW()} fg="#4d5566" emptyFg="#21262d" />
+                <text fg="#4d5566">{memVal(fmtMB(wiredMB()))}</text>
+              </box>
+              <box flexDirection="row" height={1}>
+                <text fg="#d29922">{"  comp".padEnd(8)}</text><text fg="#4d5566">{"     "}</text>
+                <AnimatedBar pct={compPct()} width={memBarW()} fg="#d29922" emptyFg="#21262d" />
+                <text fg="#d29922">{memVal(fmtMB(compMB()))}</text>
+              </box>
+              <box flexDirection="row" height={1}>
+                <text fg="#4d5566">{"  cached".padEnd(8)}</text><text fg="#4d5566">{"     "}</text>
+                <AnimatedBar pct={cachedPct()} width={memBarW()} fg="#30363d" emptyFg="#21262d" />
+                <text fg="#4d5566">{memVal(fmtMB(cachedMB()))}</text>
+              </box>
+              <box flexDirection="row" height={1}>
+                <text fg="#4d5566">{"  free".padEnd(8)}</text><text fg="#4d5566">{"     "}</text>
+                <AnimatedBar pct={freeMB() / totalMB()} width={memBarW()} fg="#2d333b" emptyFg="#21262d" />
+                <text fg="#4d5566">{memVal(fmtMB(freeMB()))}</text>
+              </box>
+              <box flexDirection="row" height={hasSwap() ? 1 : 0}>
+                <text fg={swapPct() > 0.5 ? "#d29922" : "#4d5566"}>{"  swap".padEnd(8)}</text>
+                <text fg="#4d5566">{"     "}</text>
+                <AnimatedBar pct={swapPct()} width={memBarW()} fg={swapPct() > 0.5 ? "#d29922" : "#4d5566"} emptyFg="#21262d" />
+                <text fg={swapPct() > 0.5 ? "#d29922" : "#4d5566"}>{memVal(swapValStr())}</text>
+              </box>
+              <text fg="#0d1117">{" "}</text>{/* text-node sentinel: prevents last BaseRenderable (swap) from being dropped */}
             </box>
+            <box height={0} />{/* Show sentinel */}
           </Show>
+          <box height={0} />{/* outer box sentinel */}
         </box>
 
         {/* Divider */}
@@ -194,13 +211,14 @@ export function SystemPanel(props: Props) {
             {(proc, idx) => {
               const selected = () => props.focused && idx() === (props.selectedIndex ?? 0);
               const isInlineExpanded = () => idx() === (props.expandedIndex ?? -1);
-              const color = procColor(proc.memMB);
+              const color = procColor(proc.memMB, totalMB());
+              const nameW  = procNameW();
               const marker = () => selected() ? "▸ " : "  ";
               const args = () => procInfoMap().get(proc.pid) ?? "";
               return (
                 <box flexDirection="column">
                   <box flexDirection="row" height={1} backgroundColor={selected() ? "#161b22" : undefined}>
-                    <text fg={selected() ? "#c9d1d9" : color}>{marker() + proc.cmd.slice(0, 11).padEnd(11)}</text>
+                    <text fg={selected() ? "#c9d1d9" : color}>{marker() + proc.cmd.slice(0, nameW).padEnd(nameW)}</text>
                     <AnimatedBar pct={proc.memMB / maxProcMem()} width={procBarW()} fg={selected() ? "#c9d1d9" : color} emptyFg="#21262d" />
                     <text fg={selected() ? "#c9d1d9" : color}>{fmtMB(proc.memMB).padStart(5)}</text>
                   </box>

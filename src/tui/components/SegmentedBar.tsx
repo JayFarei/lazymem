@@ -1,7 +1,8 @@
 import { createSignal, createEffect, onCleanup, untrack, For, Show } from "solid-js";
+import { animateTo } from "../animation";
 
 export interface BarSegment {
-  pct: number;   // fraction of total width (0–1); segments should sum to ≤ 1
+  pct: number;   // fraction of total width (0–1); segments should sum to <= 1
   fg: string;
   char?: string;
 }
@@ -14,7 +15,6 @@ interface Props {
 }
 
 export function SegmentedBar(props: Props) {
-  // Animate total fill (same easing as AnimatedBar)
   const [displayed, setDisplayed] = createSignal(0);
 
   const totalPct = () =>
@@ -23,15 +23,8 @@ export function SegmentedBar(props: Props) {
   createEffect(() => {
     const target = totalPct();
     const start = untrack(displayed);
-    const startTime = Date.now();
-    const dur = 450;
-    const id = setInterval(() => {
-      const t = Math.min((Date.now() - startTime) / dur, 1);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setDisplayed(start + (target - start) * eased);
-      if (t >= 1) { setDisplayed(target); clearInterval(id); }
-    }, 16);
-    onCleanup(() => clearInterval(id));
+    const cancel = animateTo(start, target, setDisplayed);
+    onCleanup(cancel);
   });
 
   const filledW = () => Math.round(displayed() * props.width);

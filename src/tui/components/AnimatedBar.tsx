@@ -1,4 +1,5 @@
 import { createSignal, createEffect, onCleanup, untrack } from "solid-js";
+import { animateTo } from "../animation";
 
 interface Props {
   pct: number;
@@ -15,20 +16,8 @@ export function AnimatedBar(props: Props) {
   createEffect(() => {
     const target = Math.max(0, Math.min(1, props.pct));
     const start = untrack(displayed);
-    const startTime = Date.now();
-    const dur = 450;
-
-    const id = setInterval(() => {
-      const t = Math.min((Date.now() - startTime) / dur, 1);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setDisplayed(start + (target - start) * eased);
-      if (t >= 1) {
-        setDisplayed(target);
-        clearInterval(id);
-      }
-    }, 16);
-
-    onCleanup(() => clearInterval(id));
+    const cancel = animateTo(start, target, setDisplayed);
+    onCleanup(cancel);
   });
 
   const filled   = () => Math.round(displayed() * props.width);

@@ -57,21 +57,23 @@ export async function collectSystem(): Promise<SystemInfo> {
 }
 
 export async function collectTopProcs(): Promise<TopProc[]> {
-  const out = await run(["top", "-l", "1", "-o", "mem", "-n", "30", "-stats", "pid,command,mem"]);
+  const out = await run(["ps", "-eo", "pid,comm,rss"]);
   return out
     .split("\n")
-    .slice(12)
     .filter((l) => l.trim())
     .map((l) => {
       const parts = l.trim().split(/\s+/);
-      if (parts.length < 3) return null;
-      const cmd = parts[1]?.trim() ?? "";
-      if (!cmd) return null;
-      const mem = parts[parts.length - 1];
-      const memMB = mem.endsWith("G") ? parseFloat(mem) * 1024 : parseInt(mem) || 0;
-      return { pid: parts[0], cmd, mem, memMB };
+      if (parts.length < 3 || !/^\d+$/.test(parts[0])) return null;
+      const pid = parts[0];
+      const cmd = parts[1];
+      const rssKB = parseInt(parts[parts.length - 1]) || 0;
+      const memMB = Math.round(rssKB / 1024);
+      const mem = memMB >= 1024 ? `${(memMB / 1024).toFixed(1)}G` : `${memMB}M`;
+      return { pid, cmd, mem, memMB };
     })
-    .filter(Boolean) as TopProc[];
+    .filter(Boolean)
+    .sort((a, b) => b!.memMB - a!.memMB)
+    .slice(0, 30) as TopProc[];
 }
 
 export async function collectTmux(): Promise<TmuxPane[]> {
@@ -93,28 +95,18 @@ export async function collectTmux(): Promise<TmuxPane[]> {
 }
 
 export async function collectProcesses(): Promise<ProcessInfo[]> {
-  const psOut = await run(["ps", "-eo", "pid,comm"]);
-  const pids = psOut
-    .split("\n")
-    .filter((l) => /claude|node/.test(l))
-    .map((l) => l.trim().split(/\s+/)[0])
-    .filter(Boolean);
-
+  const out = await run(["ps", "-eo", "pid,tty,rss,comm,args"]);
   const results: ProcessInfo[] = [];
-  for (const pid of pids) {
-    try {
-      const [ttyOut, memOut, commOut, argsOut] = await Promise.all([
-        run(["ps", "-p", pid, "-o", "tty="]),
-        run(["ps", "-p", pid, "-o", "rss="]),
-        run(["ps", "-p", pid, "-o", "comm="]),
-        run(["ps", "-p", pid, "-o", "args="]),
-      ]);
-      const tty = ttyOut.trim() || "??";
-      const mem = Math.round(parseInt(memOut.trim()) / 1024) || 0;
-      const cmd = commOut.trim();
-      const args = argsOut.trim().slice(0, 120);
-      if (cmd) results.push({ pid, tty, mem, cmd, args });
-    } catch {}
+  for (const line of out.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || !/^\d/.test(trimmed)) continue;
+    // pid tty rss comm [args with possible spaces]
+    const m = trimmed.match(/^(\d+)\s+(\S+)\s+(\d+)\s+(\S+)\s*(.*)$/);
+    if (!m) continue;
+    const [, pid, tty, rssStr, cmd, args] = m;
+    if (!/claude|node/.test(cmd) && !/claude|node/.test(args)) continue;
+    const mem = Math.round(parseInt(rssStr) / 1024) || 0;
+    results.push({ pid, tty, mem, cmd, args: args.slice(0, 120) });
   }
   return results;
 }
