@@ -11,6 +11,7 @@ interface Props {
   flexGrow?: number;
   anomalies?: Anomaly[];
   selectedIndex?: number;
+  expandedIndex?: number;
 }
 
 function parseMem(s: string): number {
@@ -46,8 +47,8 @@ const SCROLL_STYLE = {
 
 export function SystemPanel(props: Props) {
   const FOCUS_COLOR = "#58a6ff";
-  const borderColor = () => props.focused ? FOCUS_COLOR : "#30363d";
-  const titleColor  = () => props.focused ? FOCUS_COLOR : "#8b949e";
+  const borderColor = () => props.focused ? FOCUS_COLOR : "#444c56";
+  const titleColor  = () => props.focused ? FOCUS_COLOR : "#6e7681";
 
   const dims = useTerminalDimensions();
   // 3 equal columns: W/3 - border(1) - paddingX(1) - paddingX(1)
@@ -160,12 +161,23 @@ export function SystemPanel(props: Props) {
           <For each={allProcs()}>
             {(proc, idx) => {
               const selected = () => props.focused && idx() === (props.selectedIndex ?? 0);
+              const isInlineExpanded = () => idx() === (props.expandedIndex ?? -1);
               const color = procColor(proc.memMB);
               return (
-                <box flexDirection="row" height={1} backgroundColor={selected() ? "#161b22" : undefined}>
-                  <text fg={selected() ? "#c9d1d9" : color}>{proc.cmd.slice(0, 12).padEnd(13)}</text>
-                  <AnimatedBar pct={proc.memMB / maxProcMem()} width={procBarW()} fg={selected() ? "#c9d1d9" : color} emptyFg="#21262d" />
-                  <text fg={selected() ? "#c9d1d9" : color}>{fmtMB(proc.memMB).padStart(5)}</text>
+                <box flexDirection="column">
+                  <box flexDirection="row" height={1} backgroundColor={selected() ? "#161b22" : undefined}>
+                    <text fg={selected() ? "#c9d1d9" : color}>{proc.cmd.slice(0, 12).padEnd(13)}</text>
+                    <AnimatedBar pct={proc.memMB / maxProcMem()} width={procBarW()} fg={selected() ? "#c9d1d9" : color} emptyFg="#21262d" />
+                    <text fg={selected() ? "#c9d1d9" : color}>{fmtMB(proc.memMB).padStart(5)}</text>
+                  </box>
+                  <Show when={isInlineExpanded()}>
+                    <box flexDirection="row" height={1}>
+                      <text fg="#4d5566">{"  pid "}</text>
+                      <text fg="#8b949e">{proc.pid.padEnd(7)}</text>
+                      <text fg="#4d5566">{"mem "}</text>
+                      <text fg={color}>{proc.mem}</text>
+                    </box>
+                  </Show>
                 </box>
               );
             }}

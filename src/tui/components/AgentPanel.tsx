@@ -10,6 +10,7 @@ interface Props {
   panelWidth?: number;
   flexGrow?: number;
   selectedIndex?: number;
+  expandedIndex?: number;
 }
 
 const isSidecar = (args: string) =>
@@ -34,7 +35,7 @@ const SCROLL_STYLE = {
 
 export function AgentPanel(props: Props) {
   const FOCUS_COLOR = "#3fb950";
-  const borderColor = () => props.focused ? FOCUS_COLOR : "#30363d";
+  const borderColor = () => props.focused ? FOCUS_COLOR : "#444c56";
 
   const dims = useTerminalDimensions();
   // 3 equal columns: W/3 - border(1) - paddingX(1) - paddingX(1)
@@ -166,18 +167,33 @@ export function AgentPanel(props: Props) {
 
             <scrollbox flexGrow={1} focused={false} style={SCROLL_STYLE}>
               <For each={sessions()}>
-                {(s) => {
+                {(s, idx) => {
                   const pct   = () => s.totalMem / maxMem();
                   const color = () => memColor(pct(), s.totalMem);
                   const nW    = miniNameW();
+                  const isInlineExpanded = () => idx() === (props.expandedIndex ?? -1);
                   return (
-                    <box flexDirection="row" height={1}>
-                      <text fg="#c9d1d9">{"  " + s.name.slice(0, nW - 3).padEnd(nW - 2)}</text>
-                      <Show when={barWMini() >= 4}>
-                        <text fg="#30363d"> </text>
-                        <AnimatedBar pct={pct()} width={barWMini()} fg={color()} emptyFg="#21262d" />
+                    <box flexDirection="column">
+                      <box flexDirection="row" height={1}>
+                        <text fg="#c9d1d9">{"  " + s.name.slice(0, nW - 3).padEnd(nW - 2)}</text>
+                        <Show when={barWMini() >= 4}>
+                          <text fg="#30363d"> </text>
+                          <AnimatedBar pct={pct()} width={barWMini()} fg={color()} emptyFg="#21262d" />
+                        </Show>
+                        <text fg={color()}>{fmtMB(s.totalMem).padStart(6)}</text>
+                      </box>
+                      <Show when={isInlineExpanded()}>
+                        <box flexDirection="row" height={1}>
+                          <text fg="#4d5566">{"    project  "}</text>
+                          <text fg="#8b949e">{s.project.slice(0, Math.max(10, panelW() - 16))}</text>
+                        </box>
+                        <box flexDirection="row" height={1}>
+                          <text fg="#4d5566">{"    instances "}</text>
+                          <text fg="#8b949e">{String(s.instances)}</text>
+                          <text fg="#4d5566">{"  sidecars "}</text>
+                          <text fg="#4d5566">{String(s.sidecars)}</text>
+                        </box>
                       </Show>
-                      <text fg={color()}>{fmtMB(s.totalMem).padStart(6)}</text>
                     </box>
                   );
                 }}

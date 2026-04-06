@@ -31,7 +31,6 @@ export function FullscreenPane(props: Props) {
       width="100%"
       height="100%"
       flexDirection="column"
-      backgroundColor="#0d1117"
     >
       <Show when={props.pane === "sys"}>
         <SystemPanel

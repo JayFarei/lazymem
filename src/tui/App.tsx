@@ -26,6 +26,7 @@ export function App() {
     focus, setFocus, cycleFocus,
     fullscreen, toggleFullscreen, exitFullscreen,
     selectedIndex, navigateDown, navigateUp,
+    expandedIndex, toggleExpand,
   } = usePaneState();
 
   async function refresh() {
@@ -44,7 +45,23 @@ export function App() {
     switch (focus()) {
       case "sys":    return d.topProcs.length;
       case "agents": return d.sessions.length;
-      case "dev":    return d.processes.filter(p => p.tty === "??" && p.mem > 20).length;
+      case "dev": {
+        const isSC = (a: string) => a.includes("qmd mcp") || (a.includes("codex") && a.includes("mcp-server"));
+        const ttySet = new Set(d.tmux.map(p => p.tty.replace("/dev/", "")));
+        const types = new Set(
+          d.processes
+            .filter(p => !isSC(p.args) && p.cmd !== "claude" && p.mem > 20 && (p.tty === "??" || ttySet.has(p.tty)))
+            .map(p => {
+              const a = p.args;
+              if (a.includes("next")) return "next";
+              if (a.includes("vite")) return "vite";
+              if (a.includes("tailwindcss-language")) return "tailwind-lsp";
+              if (a.includes("typescript-language")) return "ts-lsp";
+              return p.cmd.split("/").pop() ?? p.cmd;
+            })
+        );
+        return Math.min(types.size, 12);
+      }
       case "docker": return d.docker.containers.length;
     }
   }
@@ -58,6 +75,7 @@ export function App() {
     setFocus,
     navigateDown:     () => navigateDown(focusedPanelSize()),
     navigateUp,
+    toggleExpand,
     toggleFullscreen,
     exitFullscreen,
     fullscreenActive: () => fullscreen() !== null,
@@ -87,6 +105,8 @@ export function App() {
   };
 
   const anomalies = () => data()?.anomalies ?? [];
+  // Only pass expandedIndex to the focused pane; others get undefined
+  const paneExp = (pane: string) => focus() === pane ? (expandedIndex() ?? undefined) : undefined;
 
   return (
     <box flexDirection="column" width={width()} height={height()}>
@@ -103,10 +123,10 @@ export function App() {
           fallback={
             /* Narrow: single column */
             <box flexDirection="column" flexGrow={1}>
-              <SystemPanel data={data()} focused={focus() === "sys"}    panelWidth={panelContentW()} anomalies={anomalies()} selectedIndex={selectedIndex()} flexGrow={focus() === "sys" ? 4 : 2} />
-              <AgentPanel  data={data()} focused={focus() === "agents"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} flexGrow={focus() === "agents" ? 4 : 2} />
-              <DevPanel    data={data()} focused={focus() === "dev"}    panelWidth={panelContentW()} flexGrow={focus() === "dev" ? 3 : 1} />
-              <DockerPanel docker={data()?.docker ?? null} focused={focus() === "docker"} panelWidth={panelContentW()} flexGrow={focus() === "docker" ? 3 : 1} />
+              <SystemPanel data={data()} focused={focus() === "sys"}    panelWidth={panelContentW()} anomalies={anomalies()} selectedIndex={selectedIndex()} expandedIndex={paneExp("sys")}    flexGrow={focus() === "sys" ? 4 : 2} />
+              <AgentPanel  data={data()} focused={focus() === "agents"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("agents")} flexGrow={focus() === "agents" ? 4 : 2} />
+              <DevPanel    data={data()} focused={focus() === "dev"}    panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("dev")}    flexGrow={focus() === "dev" ? 3 : 1} />
+              <DockerPanel docker={data()?.docker ?? null} focused={focus() === "docker"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("docker")} flexGrow={focus() === "docker" ? 3 : 1} />
             </box>
           }
         >
@@ -115,22 +135,22 @@ export function App() {
             fallback={
               /* Medium (100-119): two columns — sys | agents+dev+docker */
               <box flexDirection="row" flexGrow={1}>
-                <SystemPanel data={data()} focused={focus() === "sys"} panelWidth={panelContentW()} anomalies={anomalies()} selectedIndex={selectedIndex()} flexGrow={sysGrow()} />
+                <SystemPanel data={data()} focused={focus() === "sys"} panelWidth={panelContentW()} anomalies={anomalies()} selectedIndex={selectedIndex()} expandedIndex={paneExp("sys")}    flexGrow={sysGrow()} />
                 <box flexDirection="column" flexGrow={agentsGrow() + rightGrow()}>
-                  <AgentPanel  data={data()} focused={focus() === "agents"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} flexGrow={agentsGrow()} />
-                  <DevPanel    data={data()} focused={focus() === "dev"}    panelWidth={panelContentW()} flexGrow={devGrow()} />
-                  <DockerPanel docker={data()?.docker ?? null} focused={focus() === "docker"} panelWidth={panelContentW()} flexGrow={dockerGrow()} />
+                  <AgentPanel  data={data()} focused={focus() === "agents"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("agents")} flexGrow={agentsGrow()} />
+                  <DevPanel    data={data()} focused={focus() === "dev"}    panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("dev")}    flexGrow={devGrow()} />
+                  <DockerPanel docker={data()?.docker ?? null} focused={focus() === "docker"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("docker")} flexGrow={dockerGrow()} />
                 </box>
               </box>
             }
           >
             {/* Wide (≥120): three columns — sys | agents | dev+docker */}
             <box flexDirection="row" flexGrow={1}>
-              <SystemPanel data={data()} focused={focus() === "sys"} panelWidth={panelContentW()} anomalies={anomalies()} selectedIndex={selectedIndex()} flexGrow={sysGrow()} />
-              <AgentPanel  data={data()} focused={focus() === "agents"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} flexGrow={agentsGrow()} />
+              <SystemPanel data={data()} focused={focus() === "sys"} panelWidth={panelContentW()} anomalies={anomalies()} selectedIndex={selectedIndex()} expandedIndex={paneExp("sys")}    flexGrow={sysGrow()} />
+              <AgentPanel  data={data()} focused={focus() === "agents"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("agents")} flexGrow={agentsGrow()} />
               <box flexDirection="column" flexGrow={rightGrow()}>
-                <DevPanel    data={data()} focused={focus() === "dev"}    panelWidth={panelContentW()} flexGrow={devGrow()} />
-                <DockerPanel docker={data()?.docker ?? null} focused={focus() === "docker"} panelWidth={panelContentW()} flexGrow={dockerGrow()} />
+                <DevPanel    data={data()} focused={focus() === "dev"}    panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("dev")}    flexGrow={devGrow()} />
+                <DockerPanel docker={data()?.docker ?? null} focused={focus() === "docker"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("docker")} flexGrow={dockerGrow()} />
               </box>
             </box>
           </Show>

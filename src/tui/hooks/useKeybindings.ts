@@ -10,6 +10,7 @@ export interface KeybindingHandlers {
   setFocus:         (pane: FocusPane) => void;
   navigateDown:     () => void;
   navigateUp:       () => void;
+  toggleExpand:     () => void;
   toggleFullscreen: () => void;
   exitFullscreen:   () => void;
   fullscreenActive: () => boolean;
@@ -48,6 +49,11 @@ export function useKeybindings(h: KeybindingHandlers) {
       case "k":
       case "up":
         h.navigateUp();
+        break;
+
+      case "return":
+      case "Return":
+        h.toggleExpand();
         break;
 
       case "g":

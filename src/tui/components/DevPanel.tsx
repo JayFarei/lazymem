@@ -9,6 +9,8 @@ interface Props {
   expanded?: boolean;
   panelWidth?: number;
   flexGrow?: number;
+  selectedIndex?: number;
+  expandedIndex?: number;
 }
 
 const isSidecar = (args: string) =>
@@ -71,7 +73,7 @@ type DevEntry =
 
 export function DevPanel(props: Props) {
   const FOCUS_COLOR = "#d29922";
-  const borderColor = () => props.focused ? FOCUS_COLOR : "#30363d";
+  const borderColor = () => props.focused ? FOCUS_COLOR : "#444c56";
 
   const dims = useTerminalDimensions();
   // 3 equal columns: W/3 - border(1) - paddingX(1) - paddingX(1)
@@ -91,8 +93,11 @@ export function DevPanel(props: Props) {
 
   const devGroups = (): DevGroup[] => {
     const ttyToSession = new Map<string, string>();
+    const pathToSession = new Map<string, string>();
     for (const pane of (props.data?.tmux ?? [])) {
       ttyToSession.set(pane.tty.replace("/dev/", ""), pane.session);
+      const folder = pane.path.split("/").filter(Boolean).pop() ?? "";
+      if (folder) pathToSession.set(folder, pane.session);
     }
     const byLabel = new Map<string, Map<string, { count: number; mem: number }>>();
     for (const p of (props.data?.processes ?? []).filter(
@@ -100,7 +105,8 @@ export function DevPanel(props: Props) {
         && (p.tty === "??" || ttyToSession.has(p.tty))
     )) {
       const type = classify(p.cmd, p.args);
-      const svc  = ttyToSession.get(p.tty) ?? extractService(p.args);
+      const folder = extractService(p.args);
+      const svc  = ttyToSession.get(p.tty) ?? pathToSession.get(folder) ?? folder;
       if (!byLabel.has(type)) byLabel.set(type, new Map());
       const sm = byLabel.get(type)!;
       const s = sm.get(svc) ?? { count: 0, mem: 0 };
@@ -148,6 +154,14 @@ export function DevPanel(props: Props) {
   const totalMem     = () => devGroups().reduce((s, g) => s + g.totalMem, 0);
   const groupCount   = () => devGroups().length;
 
+  const indexedDevEntries = () => {
+    let gi = -1;
+    return devEntries().map(entry => {
+      if (entry.kind === "group") gi++;
+      return { entry, groupIndex: gi };
+    });
+  };
+
   const panelTitle = () => {
     if (!props.data) return " [3] dev ";
     return groupCount() > 0 ? ` [3] dev  ${groupCount()} · ${fmtMB(totalMem())} ` : " [3] dev ";
@@ -183,7 +197,7 @@ export function DevPanel(props: Props) {
           {/* Header row */}
           <Show when={props.expanded}>
             <box flexDirection="row" marginTop={1} height={1}>
-              <text fg="#4d5566">{"  service".padEnd(serviceW() + 2)}</text>
+              <text fg="#4d5566">{"  session".padEnd(serviceW() + 2)}</text>
               <Show when={barWMag() >= 4}>
                 <text fg="#4d5566">{"usage".padEnd(barWMag() + 1)}</text>
               </Show>
@@ -201,42 +215,66 @@ export function DevPanel(props: Props) {
           </Show>
 
           <scrollbox flexGrow={1} focused={props.focused} style={SCROLL_STYLE}>
-            <For each={devEntries()}>
-              {(entry) => {
+            <For each={indexedDevEntries()}>
+              {({ entry, groupIndex }) => {
                 if (entry.kind === "group") {
-                  const color = memColor(entry.totalMem);
+                  const selected = () => props.focused && groupIndex === (props.selectedIndex ?? 0);
+                  const color = () => memColor(entry.totalMem);
                   if (props.expanded) {
-                    // Magnified group header: label fills (panelW-5), mem right-aligned
-                    const hdr = (entry.count > 1
+                    const rawLabel = entry.count > 1
                       ? `${entry.label} ×${entry.count}`
-                      : entry.label
-                    ).slice(0, panelW() - 5).padEnd(panelW() - 5);
+                      : entry.label;
+                    const hdr = () => (selected() ? "▸ " : "  ") +
+                      rawLabel.slice(0, panelW() - 7).padEnd(panelW() - 7);
                     return (
-                      <box flexDirection="row" height={1}>
-                        <text fg="#c9d1d9">{hdr}</text>
-                        <text fg={color}>{fmtMB(entry.totalMem).padStart(5)}</text>
+                      <box flexDirection="row" height={1} backgroundColor={selected() ? "#161b22" : undefined}>
+                        <text fg={selected() ? "#e6edf3" : "#c9d1d9"}>{hdr()}</text>
+                        <text fg={color()}>{fmtMB(entry.totalMem).padStart(5)}</text>
                       </box>
                     );
                   }
-                  // Minified group row: label(miniLabelW) + " " + bar + " " + mem(5)
                   const mLW = miniLabelW();
-                  const lbl = (entry.count > 1
-                    ? `${entry.label} ×${entry.count}`
-                    : entry.label
-                  ).slice(0, mLW).padEnd(mLW);
+                  const rawLbl = entry.count > 1 ? `${entry.label} ×${entry.count}` : entry.label;
+                  const isInlineExpanded = () => groupIndex === (props.expandedIndex ?? -1);
+                  const lbl = () => selected()
+                    ? ("▸ " + rawLbl.slice(0, mLW - 2)).padEnd(mLW)
+                    : rawLbl.slice(0, mLW).padEnd(mLW);
+                  const sessions = () => devGroups()[groupIndex]?.sessions ?? [];
+                  const maxSessionMem = () => Math.max(...sessions().map(s => s.mem), 1);
                   return (
-                    <box flexDirection="row" height={1}>
-                      <text fg="#c9d1d9">{lbl}</text>
-                      <Show when={barWMini() >= 4}>
-                        <text fg="#30363d"> </text>
-                        <AnimatedBar pct={entry.totalMem / maxGroupMem()} width={barWMini()} fg={color} emptyFg="#21262d" />
+                    <box flexDirection="column">
+                      <box flexDirection="row" height={1} backgroundColor={selected() ? "#161b22" : undefined}>
+                        <text fg={selected() ? "#e6edf3" : "#c9d1d9"}>{lbl()}</text>
+                        <Show when={barWMini() >= 4}>
+                          <text fg="#30363d"> </text>
+                          <AnimatedBar pct={entry.totalMem / maxGroupMem()} width={barWMini()} fg={color()} emptyFg="#21262d" />
+                        </Show>
+                        <text fg={color()}>{fmtMB(entry.totalMem).padStart(6)}</text>
+                      </box>
+                      <Show when={isInlineExpanded()}>
+                        <For each={sessions()}>
+                          {(s) => {
+                            const sColor = memColor(s.mem);
+                            const sW = mLW - 2;
+                            const sLabel = (s.count > 1 ? `  ${s.service} ×${s.count}` : `  ${s.service}`).slice(0, sW).padEnd(sW);
+                            return (
+                              <box flexDirection="row" height={1}>
+                                <text fg="#6e7681">{sLabel}</text>
+                                <Show when={barWMini() >= 4}>
+                                  <text fg="#21262d"> </text>
+                                  <AnimatedBar pct={s.mem / maxSessionMem()} width={barWMini()} fg={sColor} emptyFg="#21262d" />
+                                </Show>
+                                <text fg={sColor}>{fmtMB(s.mem).padStart(6)}</text>
+                              </box>
+                            );
+                          }}
+                        </For>
                       </Show>
-                      <text fg={color}>{fmtMB(entry.totalMem).padStart(6)}</text>
                     </box>
                   );
                 }
 
-                // Magnified child row: "  "+service(serviceW) + bar + " " + mem(5)
+                // Magnified child row: "  "+session(serviceW) + bar + " " + mem(5)
                 const childColor = memColor(entry.mem);
                 const sW = serviceW();
                 const svcStr = (entry.count > 1
