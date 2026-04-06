@@ -118,61 +118,68 @@ export function App() {
         <HelpOverlay onClose={() => setShowHelp(false)} />
       </Show>
 
-      {/* ── Main dashboard ─────────────────────────────────── */}
+      {/* ── Main content (dashboard OR fullscreen, never both) ── */}
       <Show when={!showHelp()}>
         <Show
-          when={!narrow()}
+          when={fullscreen() !== null}
           fallback={
-            /* Narrow: single column */
+            /* ── Dashboard ─────────────────────────────────────── */
             <box flexDirection="column" flexGrow={1}>
-              <SystemPanel data={data()} focused={focus() === "sys"}    panelWidth={panelContentW()} anomalies={anomalies()} selectedIndex={selectedIndex()} expandedIndex={paneExp("sys")}    flexGrow={focus() === "sys" ? 4 : 2} />
-              <AgentPanel  data={data()} focused={focus() === "agents"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("agents")} flexGrow={focus() === "agents" ? 4 : 2} />
-              <DevPanel    data={data()} focused={focus() === "dev"}    panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("dev")}    flexGrow={focus() === "dev" ? 3 : 1} />
-              <DockerPanel docker={data()?.docker ?? null} focused={focus() === "docker"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("docker")} flexGrow={focus() === "docker" ? 3 : 1} />
+              <Show
+                when={!narrow()}
+                fallback={
+                  /* Narrow: single column */
+                  <box flexDirection="column" flexGrow={1}>
+                    <SystemPanel data={data()} focused={focus() === "sys"}    panelWidth={panelContentW()} anomalies={anomalies()} selectedIndex={selectedIndex()} expandedIndex={paneExp("sys")}    flexGrow={focus() === "sys" ? 4 : 2} />
+                    <AgentPanel  data={data()} focused={focus() === "agents"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("agents")} flexGrow={focus() === "agents" ? 4 : 2} />
+                    <DevPanel    data={data()} focused={focus() === "dev"}    panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("dev")}    flexGrow={focus() === "dev" ? 3 : 1} />
+                    <DockerPanel docker={data()?.docker ?? null} focused={focus() === "docker"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("docker")} flexGrow={focus() === "docker" ? 3 : 1} />
+                  </box>
+                }
+              >
+                <Show
+                  when={wide()}
+                  fallback={
+                    /* Medium (100-119): two columns — sys | agents+dev+docker */
+                    <box flexDirection="row" flexGrow={1}>
+                      <SystemPanel data={data()} focused={focus() === "sys"} panelWidth={panelContentW()} anomalies={anomalies()} selectedIndex={selectedIndex()} expandedIndex={paneExp("sys")}    flexGrow={sysGrow()} />
+                      <box flexDirection="column" flexGrow={agentsGrow() + rightGrow()}>
+                        <AgentPanel  data={data()} focused={focus() === "agents"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("agents")} flexGrow={agentsGrow()} />
+                        <DevPanel    data={data()} focused={focus() === "dev"}    panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("dev")}    flexGrow={devGrow()} />
+                        <DockerPanel docker={data()?.docker ?? null} focused={focus() === "docker"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("docker")} flexGrow={dockerGrow()} />
+                      </box>
+                    </box>
+                  }
+                >
+                  {/* Wide (≥120): three columns — sys | agents | dev+docker */}
+                  <box flexDirection="row" flexGrow={1}>
+                    <SystemPanel data={data()} focused={focus() === "sys"} panelWidth={panelContentW()} anomalies={anomalies()} selectedIndex={selectedIndex()} expandedIndex={paneExp("sys")}    flexGrow={sysGrow()} />
+                    <AgentPanel  data={data()} focused={focus() === "agents"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("agents")} flexGrow={agentsGrow()} />
+                    <box flexDirection="column" flexGrow={rightGrow()}>
+                      <DevPanel    data={data()} focused={focus() === "dev"}    panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("dev")}    flexGrow={devGrow()} />
+                      <DockerPanel docker={data()?.docker ?? null} focused={focus() === "docker"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("docker")} flexGrow={dockerGrow()} />
+                    </box>
+                  </box>
+                </Show>
+              </Show>
+
+              <StatusBar
+                loading={loading()}
+                instances={data()?.totalInstances ?? 0}
+                totalMem={data()?.totalClaudeMem ?? 0}
+                anomalies={anomalies().length}
+                focus={focus()}
+              />
             </box>
           }
         >
-          <Show
-            when={wide()}
-            fallback={
-              /* Medium (100-119): two columns — sys | agents+dev+docker */
-              <box flexDirection="row" flexGrow={1}>
-                <SystemPanel data={data()} focused={focus() === "sys"} panelWidth={panelContentW()} anomalies={anomalies()} selectedIndex={selectedIndex()} expandedIndex={paneExp("sys")}    flexGrow={sysGrow()} />
-                <box flexDirection="column" flexGrow={agentsGrow() + rightGrow()}>
-                  <AgentPanel  data={data()} focused={focus() === "agents"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("agents")} flexGrow={agentsGrow()} />
-                  <DevPanel    data={data()} focused={focus() === "dev"}    panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("dev")}    flexGrow={devGrow()} />
-                  <DockerPanel docker={data()?.docker ?? null} focused={focus() === "docker"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("docker")} flexGrow={dockerGrow()} />
-                </box>
-              </box>
-            }
-          >
-            {/* Wide (≥120): three columns — sys | agents | dev+docker */}
-            <box flexDirection="row" flexGrow={1}>
-              <SystemPanel data={data()} focused={focus() === "sys"} panelWidth={panelContentW()} anomalies={anomalies()} selectedIndex={selectedIndex()} expandedIndex={paneExp("sys")}    flexGrow={sysGrow()} />
-              <AgentPanel  data={data()} focused={focus() === "agents"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("agents")} flexGrow={agentsGrow()} />
-              <box flexDirection="column" flexGrow={rightGrow()}>
-                <DevPanel    data={data()} focused={focus() === "dev"}    panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("dev")}    flexGrow={devGrow()} />
-                <DockerPanel docker={data()?.docker ?? null} focused={focus() === "docker"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("docker")} flexGrow={dockerGrow()} />
-              </box>
-            </box>
-          </Show>
-        </Show>
-
-        <StatusBar
-          loading={loading()}
-          instances={data()?.totalInstances ?? 0}
-          totalMem={data()?.totalClaudeMem ?? 0}
-          anomalies={anomalies().length}
-          focus={focus()}
-        />
-
-        {/* ── Fullscreen overlay ─────────────────────────────── */}
-        <Show when={fullscreen() !== null}>
+          {/* ── Fullscreen ───────────────────────────────────── */}
           <FullscreenPane
             pane={fullscreen()!}
             data={data()}
             anomalies={anomalies()}
             selectedIndex={selectedIndex()}
+            expandedIndex={expandedIndex() ?? undefined}
           />
         </Show>
       </Show>

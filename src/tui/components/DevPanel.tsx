@@ -13,13 +13,15 @@ interface Props {
   expandedIndex?: number;
 }
 
-const isSidecar = (args: string) =>
-  args.includes("qmd mcp") || (args.includes("codex") && args.includes("mcp-server"));
+// Only qmd-mcp is hidden from DevPanel (pure infrastructure noise).
+// codex-mcp-server is shown as its own service group so its memory is visible.
+const isSidecar = (args: string) => args.includes("qmd mcp");
 
 function classify(cmd: string, args: string): string {
   // Agent harnesses — classified before dev-server heuristics
-  if (cmd === "claude" || cmd.includes("claude"))              return "claude";
-  if (args.toLowerCase().includes("codex"))                    return "codex";
+  if (cmd === "claude" || cmd.includes("claude"))                          return "claude";
+  if (args.includes("codex") && args.includes("mcp-server"))               return "codex-mcp";
+  if (args.toLowerCase().includes("codex"))                                 return "codex";
   if (args.includes("next"))                 return "next";
   if (args.includes("vite"))                 return "vite";
   if (args.includes("tailwindcss-language")) return "tailwind-lsp";

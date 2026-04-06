@@ -1,8 +1,8 @@
 /**
- * Fullscreen overlay for a single panel.
+ * Fullscreen view for a single panel.
  * Triggered by `g`, exited with `g` or Escape.
- * Uses position="absolute" to cover the entire terminal, same pattern as the
- * usage CLI reference project (FullscreenMetricView).
+ * Rendered *instead of* the dashboard (not on top of it), so no
+ * background-fill hack is needed and content never overlaps.
  */
 import { Show } from "solid-js";
 import type { FocusPane } from "../hooks/useViewMode";
@@ -18,20 +18,14 @@ interface Props {
   data: AuditData | null;
   anomalies: Anomaly[];
   selectedIndex: number;
+  expandedIndex?: number;
 }
 
 export function FullscreenPane(props: Props) {
   const docker = (): DockerInfo | null => props.data?.docker ?? null;
 
   return (
-    <box
-      position="absolute"
-      top={0}
-      left={0}
-      width="100%"
-      height="100%"
-      flexDirection="column"
-    >
+    <box flexDirection="column" flexGrow={1}>
       <Show when={props.pane === "sys"}>
         <SystemPanel
           data={props.data}
@@ -39,6 +33,7 @@ export function FullscreenPane(props: Props) {
           expanded={true}
           anomalies={props.anomalies}
           selectedIndex={props.selectedIndex}
+          expandedIndex={props.expandedIndex}
           flexGrow={1}
         />
       </Show>
@@ -49,16 +44,31 @@ export function FullscreenPane(props: Props) {
           focused={true}
           expanded={true}
           selectedIndex={props.selectedIndex}
+          expandedIndex={props.expandedIndex}
           flexGrow={1}
         />
       </Show>
 
       <Show when={props.pane === "dev"}>
-        <DevPanel data={props.data} focused={true} expanded={true} flexGrow={1} />
+        <DevPanel
+          data={props.data}
+          focused={true}
+          expanded={true}
+          selectedIndex={props.selectedIndex}
+          expandedIndex={props.expandedIndex}
+          flexGrow={1}
+        />
       </Show>
 
       <Show when={props.pane === "docker"}>
-        <DockerPanel docker={docker()} focused={true} expanded={true} flexGrow={1} />
+        <DockerPanel
+          docker={docker()}
+          focused={true}
+          expanded={true}
+          selectedIndex={props.selectedIndex}
+          expandedIndex={props.expandedIndex}
+          flexGrow={1}
+        />
       </Show>
 
       <box height={1} paddingX={1}>

@@ -198,6 +198,60 @@ if $run_all || [[ "$TARGETS" == "docker" ]]; then
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Fullscreen overlap test
+# Verifies that pressing g renders ONLY the focused pane — dashboard panels
+# must not bleed through (the old absolute-overlay bug).
+# ─────────────────────────────────────────────────────────────────────────────
+if $run_all || [[ "$TARGETS" == "fullscreen" ]]; then
+  section "fullscreen no-overlap"
+
+  # Focus sys (pane 1) and open fullscreen
+  send "1"; sleep 0.3
+  local BEFORE; BEFORE=$(capture)
+  # Count how many panel title markers [N] are visible in normal mode
+  local NORMAL_PANELS; NORMAL_PANELS=$(echo "$BEFORE" | grep -oE "\[[1-4]\] (sys|agents|dev|docker)" | wc -l | tr -d ' ')
+
+  send "g"; sleep 0.5
+  local FS; FS=$(capture)
+
+  # In fullscreen only ONE panel title should be visible
+  local FS_PANELS; FS_PANELS=$(echo "$FS" | grep -oE "\[[1-4]\] (sys|agents|dev|docker)" | wc -l | tr -d ' ')
+
+  if [ "$FS_PANELS" -eq 1 ]; then
+    pass "Fullscreen shows exactly 1 panel title (was $NORMAL_PANELS in dashboard)"
+  else
+    fail "Fullscreen shows $FS_PANELS panel titles — dashboard is bleeding through"
+    info "Fullscreen output (first 20 non-blank lines):"
+    echo "$FS" | grep -v "^[[:space:]]*$" | head -20 | sed 's/^/      /'
+  fi
+
+  # Dashboard panel borders (╭ from other panels) must not appear alongside fullscreen content
+  local FS_BORDERS; FS_BORDERS=$(echo "$FS" | grep -c "╭" || echo 0)
+  if [ "$FS_BORDERS" -le 1 ]; then
+    pass "At most 1 rounded-border corner in fullscreen (no dashboard bleed, got $FS_BORDERS)"
+  else
+    fail "Multiple panel borders visible in fullscreen ($FS_BORDERS) — content overlapping"
+  fi
+
+  # The hint bar (g or Esc) must be visible at the bottom
+  if echo "$FS" | grep -qE "exit fullscreen"; then
+    pass "Fullscreen hint bar visible"
+  else
+    fail "Fullscreen hint bar missing"
+  fi
+
+  # Exit fullscreen
+  send "g"; sleep 0.3
+  local AFTER; AFTER=$(capture)
+  local AFTER_PANELS; AFTER_PANELS=$(echo "$AFTER" | grep -oE "\[[1-4]\] (sys|agents|dev|docker)" | wc -l | tr -d ' ')
+  if [ "$AFTER_PANELS" -gt 1 ]; then
+    pass "Dashboard restored after exiting fullscreen ($AFTER_PANELS panels)"
+  else
+    fail "Dashboard not restored after exiting fullscreen (only $AFTER_PANELS panels visible)"
+  fi
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Summary
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
