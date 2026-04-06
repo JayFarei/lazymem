@@ -2,6 +2,7 @@ import { For, Show } from "solid-js";
 import { useTerminalDimensions } from "@opentui/solid";
 import type { AuditData, Anomaly } from "../../core/index";
 import { AnimatedBar } from "./AnimatedBar";
+import { SegmentedBar } from "./SegmentedBar";
 
 interface Props {
   data: AuditData | null;
@@ -71,6 +72,13 @@ export function SystemPanel(props: Props) {
   const cachedPct = () => cachedMB() / totalMB();
   const appPct    = () => appMB()    / totalMB();
 
+  // Segmented RAM bar: app+wired (green) | comp (amber) | cached (dark)
+  const ramSegments = () => [
+    { pct: (appMB() + wiredMB()) / totalMB(), fg: ramColor(usedPct()) },
+    { pct: compMB()   / totalMB(), fg: "#d29922" },
+    { pct: cachedMB() / totalMB(), fg: "#30363d" },
+  ];
+
   const swapUsedStr = () => sys()?.swap?.used  ?? "";
   const swapTotStr  = () => sys()?.swap?.total ?? "";
   const swapFreeStr = () => sys()?.swap?.free  ?? "";
@@ -124,7 +132,7 @@ export function SystemPanel(props: Props) {
           <box flexDirection="row" height={1}>
             <text fg={titleColor()}>{"RAM ".padEnd(6)}</text>
             <text fg={ramColor(usedPct())}>{ramPctStr().padStart(4)}  </text>
-            <AnimatedBar pct={usedPct()} width={memBarW()} fg={ramColor(usedPct())} emptyFg="#21262d" />
+            <SegmentedBar segments={ramSegments()} width={memBarW()} emptyFg="#21262d" />
             <text fg="#8b949e">  {fmtMB(usedMB())}/{fmtMB(totalMB())} </text>
           </box>
           {/* Breakdown rows — magnified only */}
