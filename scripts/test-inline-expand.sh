@@ -1,205 +1,208 @@
 #!/usr/bin/env bash
 # test-inline-expand.sh
-# Validates inline accordion expansion (Enter key) in lazymem.
+# Validates inline accordion expansion (Enter key) across all lazymem panes.
 #
 # Usage:
-#   bash scripts/test-inline-expand.sh [pane]
-#   pane: sys | agents | dev | docker  (default: dev)
+#   bash scripts/test-inline-expand.sh [all|sys|agents|dev|docker]
+#   Default: all
 #
-# Requires: tmux, bun, lazymem in current directory
+# Exit codes: 0 = all pass, 1 = one or more failures
+# Requires: tmux, bun
 
 set -euo pipefail
 
-PANE=${1:-dev}
-SESSION="lazymem-test-expand"
+TARGETS="${1:-all}"
+SESSION="lazymem-test-$$"
 TERM_W=200
-TERM_H=50
-WAIT_READY=4      # seconds to wait for first render
-WAIT_KEY=0.4      # seconds to wait after each keypress
-PASS=0
-FAIL=0
+TERM_H=55
+WAIT_KEY=0.5
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
 
-log()  { echo -e "  $*"; }
-pass() { echo -e "  ${GREEN}PASS${NC}  $*"; PASS=$((PASS+1)); }
-fail() { echo -e "  ${RED}FAIL${NC}  $*"; FAIL=$((FAIL+1)); }
-info() { echo -e "  ${YELLOW}----${NC}  $*"; }
+TOTAL_PASS=0
+TOTAL_FAIL=0
+TOTAL_SKIP=0
 
-cleanup() {
-  tmux kill-session -t "$SESSION" 2>/dev/null || true
-}
+pass() { echo -e "    ${GREEN}PASS${NC}  $*"; TOTAL_PASS=$((TOTAL_PASS+1)); }
+fail() { echo -e "    ${RED}FAIL${NC}  $*"; TOTAL_FAIL=$((TOTAL_FAIL+1)); }
+skip() { echo -e "    ${YELLOW}SKIP${NC}  $*"; TOTAL_SKIP=$((TOTAL_SKIP+1)); }
+info() { echo -e "    ${BLUE}....${NC}  $*"; }
+section() { echo -e "\n  ${YELLOW}$*${NC}"; }
+
+cleanup() { tmux kill-session -t "$SESSION" 2>/dev/null || true; }
 trap cleanup EXIT
 
-# Map pane name to its number key
-pane_key() {
-  case $1 in
-    sys)    echo "1" ;;
-    agents) echo "2" ;;
-    dev)    echo "3" ;;
-    docker) echo "4" ;;
-    *) echo "1" ;;
-  esac
-}
+capture() { tmux capture-pane -t "$SESSION" -p 2>/dev/null | cat; }
 
-# Capture current tmux pane content (strips ANSI codes)
-capture() {
-  tmux capture-pane -t "$SESSION" -p | cat
-}
+send() { tmux send-keys -t "$SESSION" "$1" ""; sleep "$WAIT_KEY"; }
+send_enter() { tmux send-keys -t "$SESSION" Enter; sleep "$WAIT_KEY"; }
 
-# Wait until a pattern appears in the output (polls every 0.5s, timeout after N secs)
 wait_for() {
-  local pattern="$1"
-  local timeout="${2:-8}"
-  local elapsed=0
+  local pattern="$1" timeout="${2:-12}" elapsed=0
   while ! capture | grep -qE "$pattern"; do
-    sleep 0.5
-    elapsed=$((elapsed + 1))
-    if [ "$elapsed" -ge "$((timeout * 2))" ]; then
-      echo "  Timeout waiting for: $pattern"
-      capture | tail -5
-      return 1
+    sleep 0.5; elapsed=$((elapsed+1))
+    if [ "$elapsed" -ge "$((timeout*2))" ]; then
+      echo "    Timeout waiting for: $pattern"; capture | tail -4; return 1
     fi
   done
 }
 
-send() {
-  tmux send-keys -t "$SESSION" "$1" ""
-  sleep "$WAIT_KEY"
-}
+# Count non-blank content lines matching a pattern
+content_lines() { echo "$1" | grep -cE "${2:-[a-zA-Z0-9]}" 2>/dev/null || echo 0; }
 
-send_enter() {
-  tmux send-keys -t "$SESSION" Enter
-  sleep "$WAIT_KEY"
-}
-
+# ── Launch lazymem ────────────────────────────────────────────────────────────
 echo ""
-echo "lazymem inline-expand test — pane: $PANE"
-echo "==========================================="
+echo "  lazymem inline-expand tests"
+echo "  =============================="
 
-# 1. Kill any leftover session
-tmux kill-session -t "$SESSION" 2>/dev/null || true
-sleep 0.2
-
-# 2. Start lazymem in a new tmux session
-info "Starting lazymem..."
+tmux kill-session -t "$SESSION" 2>/dev/null || true; sleep 0.2
 tmux new-session -d -s "$SESSION" -x "$TERM_W" -y "$TERM_H"
-tmux send-keys -t "$SESSION" "bun --preload=./node_modules/@opentui/solid/scripts/preload.ts src/index.tsx" Enter
+tmux send-keys -t "$SESSION" \
+  "cd '$ROOT' && bun --preload=./node_modules/@opentui/solid/scripts/preload.ts src/index.tsx" Enter
 
-# 3. Wait for it to render (look for panel borders)
-info "Waiting for render..."
-wait_for "\[1\]" 12
-sleep 1  # extra settle time
+info "Waiting for lazymem to render..."
+wait_for "\[1\] sys" 15
+sleep 1.5
+info "Render confirmed."
 
-INITIAL=$(capture)
-info "Initial render captured ($(echo "$INITIAL" | wc -l) lines)"
+# ─────────────────────────────────────────────────────────────────────────────
+# Generic test runner for a single pane
+# Args: $1=key(1-4)  $2=panelName  $3=expectedDetailPattern  $4=skipIfMissing
+# ─────────────────────────────────────────────────────────────────────────────
+test_pane() {
+  local KEY="$1" PNAME="$2" DETAIL_PAT="$3" SKIP_PAT="${4:-}"
 
-# 4. Focus the target pane
-KEY=$(pane_key "$PANE")
-info "Pressing $KEY to focus $PANE panel..."
-send "$KEY"
+  section "[$KEY] $PNAME"
 
-sleep 0.3
-FOCUSED=$(capture)
+  # Focus the pane
+  send "$KEY"; sleep 0.3
+  local FOCUSED; FOCUSED=$(capture)
 
-# ── Test: panel has focus indicator ──────────────────────────────────────────
-if echo "$FOCUSED" | grep -qE "\[$KEY\] $PANE"; then
-  pass "Panel [$KEY] $PANE is visible"
-else
-  fail "Panel [$KEY] $PANE not found in output"
-  info "Captured output:"
-  echo "$FOCUSED" | head -20
-fi
-
-# 5. Navigate to first row (press j once then k to reset to 0, ensuring we're at row 0)
-info "Navigating to first row..."
-send "k"   # make sure we're at top
-sleep 0.2
-PRE_EXPAND=$(capture)
-
-# ── Test: selection marker visible ───────────────────────────────────────────
-if echo "$PRE_EXPAND" | grep -qE "▸"; then
-  pass "Selection marker (▸) visible before expand"
-else
-  fail "Selection marker (▸) not found before expand"
-  info "Captured:"
-  echo "$PRE_EXPAND" | grep -v "^$" | head -15
-fi
-
-# Count lines in the pane area (rough: lines that aren't all spaces/borders)
-PRE_CONTENT_LINES=$(echo "$PRE_EXPAND" | grep -cE "▸|  [a-zA-Z0-9]" || echo 0)
-info "Content lines before expand: $PRE_CONTENT_LINES"
-
-# 6. Press Enter to expand
-info "Pressing Enter to expand selected row..."
-send_enter
-POST_EXPAND=$(capture)
-
-# ── Test: expansion appeared ─────────────────────────────────────────────────
-POST_CONTENT_LINES=$(echo "$POST_EXPAND" | grep -cE "▸|  [a-zA-Z0-9]" || echo 0)
-info "Content lines after expand: $POST_CONTENT_LINES"
-
-if [ "$POST_CONTENT_LINES" -gt "$PRE_CONTENT_LINES" ]; then
-  pass "More content lines after expand ($PRE_CONTENT_LINES -> $POST_CONTENT_LINES)"
-else
-  fail "Content lines did not increase after expand ($PRE_CONTENT_LINES -> $POST_CONTENT_LINES)"
-  info "Post-expand capture:"
-  echo "$POST_EXPAND" | grep -v "^[[:space:]]*$" | head -20
-fi
-
-# ── Test: inline detail appears BELOW the selected row ───────────────────────
-# Find the line number of the ▸ marker, then check that subsequent lines have indented content
-ARROW_LINE=$(echo "$POST_EXPAND" | grep -n "▸" | head -1 | cut -d: -f1)
-if [ -n "$ARROW_LINE" ]; then
-  NEXT_LINES=$(echo "$POST_EXPAND" | tail -n +"$((ARROW_LINE + 1))" | head -5)
-  if echo "$NEXT_LINES" | grep -qE "^[[:space:]]{2,}[a-zA-Z0-9/]"; then
-    pass "Inline detail content appears immediately below the selected row (line $ARROW_LINE)"
-  else
-    fail "No indented detail content found below selected row (line $ARROW_LINE)"
-    info "Lines after ▸:"
-    echo "$NEXT_LINES" | cat -A | head -5
+  # Check the pane is actually visible
+  if ! echo "$FOCUSED" | grep -qE "\[$KEY\] $PNAME"; then
+    skip "[$KEY] $PNAME not in output (panel may be hidden at current terminal size)"
+    return
   fi
-else
-  fail "Could not locate ▸ marker in post-expand output"
+  pass "Panel [$KEY] $PNAME visible and focused"
+
+  # Optional: skip if panel has no data rows to select
+  if [ -n "$SKIP_PAT" ] && ! echo "$FOCUSED" | grep -qE "$SKIP_PAT"; then
+    skip "No rows to select in [$KEY] $PNAME (pattern not found: $SKIP_PAT)"
+    return
+  fi
+
+  # Navigate to row 0 (k resets to top)
+  send "k"; sleep 0.2
+  local PRE; PRE=$(capture)
+
+  # ── Marker visible ───────────────────────────────────────────────────────
+  if echo "$PRE" | grep -qE "▸"; then
+    pass "Selection marker (▸) visible on row 0"
+  else
+    fail "Selection marker (▸) missing before expand in $PNAME"
+    info "Captured (first 15 non-blank lines):"
+    echo "$PRE" | grep -v "^[[:space:]]*$" | head -15 | sed 's/^/      /'
+    # Can't continue meaningful tests without marker
+    return
+  fi
+
+  local PRE_LINES; PRE_LINES=$(content_lines "$PRE" "▸|  [a-zA-Z0-9]")
+
+  # ── Press Enter — expand ─────────────────────────────────────────────────
+  send_enter
+  local POST; POST=$(capture)
+  local POST_LINES; POST_LINES=$(content_lines "$POST" "▸|  [a-zA-Z0-9]")
+
+  if [ "$POST_LINES" -gt "$PRE_LINES" ]; then
+    pass "Line count increased after expand ($PRE_LINES -> $POST_LINES)"
+  else
+    fail "Line count did not increase after expand ($PRE_LINES -> $POST_LINES) in $PNAME"
+    info "Post-expand (first 20 non-blank lines):"
+    echo "$POST" | grep -v "^[[:space:]]*$" | head -20 | sed 's/^/      /'
+  fi
+
+  # ── Detail appears below ▸ ───────────────────────────────────────────────
+  local ARROW_LINE; ARROW_LINE=$(echo "$POST" | grep -n "▸" | head -1 | cut -d: -f1)
+  if [ -z "$ARROW_LINE" ]; then
+    fail "▸ marker missing after expand in $PNAME"
+  else
+    local BELOW; BELOW=$(echo "$POST" | tail -n +"$((ARROW_LINE+1))" | head -6)
+    if echo "$BELOW" | grep -qE "^[[:space:]]{2,}[a-zA-Z0-9/]"; then
+      pass "Indented detail content appears below ▸ (line $ARROW_LINE)"
+    else
+      fail "No indented detail below ▸ in $PNAME (line $ARROW_LINE)"
+      info "Lines after ▸:"; echo "$BELOW" | sed 's/^/      /'
+    fi
+    # Check panel-specific detail content
+    if echo "$BELOW" | grep -qE "$DETAIL_PAT"; then
+      pass "Expected detail pattern found: '$DETAIL_PAT'"
+    else
+      fail "Expected detail pattern NOT found: '$DETAIL_PAT'"
+      info "Lines after ▸:"; echo "$BELOW" | sed 's/^/      /'
+    fi
+  fi
+
+  # ── Navigate away — expansion collapses ─────────────────────────────────
+  send "j"; sleep 0.2
+  local POST_NAV; POST_NAV=$(capture)
+  local NAV_LINES; NAV_LINES=$(content_lines "$POST_NAV" "▸|  [a-zA-Z0-9]")
+
+  if [ "$NAV_LINES" -le "$POST_LINES" ]; then
+    pass "j collapses expansion ($POST_LINES -> $NAV_LINES lines)"
+  else
+    fail "j did not collapse expansion in $PNAME ($POST_LINES -> $NAV_LINES)"
+  fi
+
+  # ── Enter twice — expand then collapse ──────────────────────────────────
+  send_enter        # expand row 1
+  local EXP2; EXP2=$(capture)
+  local EXP2_LINES; EXP2_LINES=$(content_lines "$EXP2" "▸|  [a-zA-Z0-9]")
+  send_enter        # same Enter collapses
+  local COLL; COLL=$(capture)
+  local COLL_LINES; COLL_LINES=$(content_lines "$COLL" "▸|  [a-zA-Z0-9]")
+
+  if [ "$COLL_LINES" -lt "$EXP2_LINES" ]; then
+    pass "Second Enter collapses expansion ($EXP2_LINES -> $COLL_LINES lines)"
+  else
+    fail "Second Enter did not collapse in $PNAME ($EXP2_LINES -> $COLL_LINES)"
+  fi
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Run panes
+# Args: key, panel name, detail pattern (grep -E against lines below ▸), skip-if-missing pattern
+# ─────────────────────────────────────────────────────────────────────────────
+
+run_all=false
+[[ "$TARGETS" == "all" ]] && run_all=true
+
+if $run_all || [[ "$TARGETS" == "sys" ]]; then
+  # sys: detail shows "pid" and "raw" labels; skip-if: at least one proc row
+  test_pane "1" "sys" "pid|raw" "[0-9]"
 fi
 
-# ── Test: navigation while expanded collapses the expansion ──────────────────
-info "Pressing j to navigate (should collapse expansion)..."
-send "j"
-POST_NAV=$(capture)
-
-NAV_CONTENT_LINES=$(echo "$POST_NAV" | grep -cE "▸|  [a-zA-Z0-9]" || echo 0)
-# After navigation, content lines should be back to approximately pre-expand level
-# (the old expansion is gone, new row is selected but not expanded)
-if [ "$NAV_CONTENT_LINES" -le "$POST_CONTENT_LINES" ] && [ "$NAV_CONTENT_LINES" -ge "$PRE_CONTENT_LINES" ]; then
-  pass "Navigation collapsed expansion (lines: $POST_CONTENT_LINES -> $NAV_CONTENT_LINES)"
-else
-  info "Lines after nav: $NAV_CONTENT_LINES (pre=$PRE_CONTENT_LINES, post-expand=$POST_CONTENT_LINES)"
-  pass "Navigation moved selection (manual verification needed)"
+if $run_all || [[ "$TARGETS" == "agents" ]]; then
+  # agents: detail shows "session", "project", "claude"; skip-if: sessions listed
+  test_pane "2" "agents" "session|project|claude" "▸"
 fi
 
-# ── Test: Enter again to collapse ────────────────────────────────────────────
-info "Re-expanding with Enter..."
-send_enter
-send_enter  # second Enter should collapse
-POST_COLLAPSE=$(capture)
-
-COLLAPSE_LINES=$(echo "$POST_COLLAPSE" | grep -cE "▸|  [a-zA-Z0-9]" || echo 0)
-if [ "$COLLAPSE_LINES" -le "$POST_CONTENT_LINES" ]; then
-  pass "Second Enter collapsed the expansion ($POST_CONTENT_LINES -> $COLLAPSE_LINES)"
-else
-  fail "Second Enter did not collapse expansion ($POST_CONTENT_LINES -> $COLLAPSE_LINES)"
+if $run_all || [[ "$TARGETS" == "dev" ]]; then
+  # dev: child rows indented with 2+ spaces; skip-if: at least one service group
+  test_pane "3" "dev" "^  [[:space:]][a-zA-Z0-9/]" "▸"
 fi
 
-# ── Summary ──────────────────────────────────────────────────────────────────
+if $run_all || [[ "$TARGETS" == "docker" ]]; then
+  # docker: detail shows "name" and ("image" or "cpu"); skip-if: container rows
+  test_pane "4" "docker" "name|image|cpu" "▸"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Summary
+# ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "==========================================="
-echo -e "  Results: ${GREEN}${PASS} passed${NC}, ${RED}${FAIL} failed${NC}"
+echo "  =============================="
+echo -e "  ${GREEN}${TOTAL_PASS} passed${NC}  ${RED}${TOTAL_FAIL} failed${NC}  ${YELLOW}${TOTAL_SKIP} skipped${NC}"
 echo ""
 
-if [ "$FAIL" -gt 0 ]; then
-  exit 1
-fi
+[ "$TOTAL_FAIL" -eq 0 ]

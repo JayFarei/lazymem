@@ -161,19 +161,19 @@ export function DockerPanel(props: Props) {
                     <Show when={isInlineExpanded()}>
                       <box flexDirection="row" height={1}>
                         <text fg="#4d5566">{"  name   "}</text>
-                        <text fg="#8b949e">{c.name.slice(0, Math.max(10, panelW() - 12))}</text>
+                        <text fg="#e6edf3">{c.name.slice(0, Math.max(10, panelW() - 11))}</text>
                       </box>
                       <Show when={!!c.image}>
                         <box flexDirection="row" height={1}>
                           <text fg="#4d5566">{"  image  "}</text>
-                          <text fg="#8b949e">{(c.image ?? "").slice(0, Math.max(10, panelW() - 12))}</text>
+                          <text fg="#8b949e">{(c.image ?? "").slice(0, Math.max(10, panelW() - 11))}</text>
                         </box>
                       </Show>
                       <box flexDirection="row" height={1}>
                         <text fg="#4d5566">{"  cpu    "}</text>
-                        <text fg="#8b949e">{c.cpu}</text>
-                        <text fg="#4d5566">{"  mem  "}</text>
-                        <text fg={color()}>{c.mem}</text>
+                        <text fg="#8b949e">{c.cpu.trim()}</text>
+                        <text fg="#4d5566">{"   mem   "}</text>
+                        <text fg={color()}>{c.mem.trim()}</text>
                       </box>
                     </Show>
                   </box>

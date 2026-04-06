@@ -77,8 +77,16 @@ export function SystemPanel(props: Props) {
   const swapPct     = () => swapTotalMB() > 0 ? swapUsedMB() / swapTotalMB() : 0;
   const hasSwap     = () => swapTotalMB() > 0;
 
-  const allProcs   = () => [...(props.data?.topProcs ?? [])].sort((a, b) => b.memMB - a.memMB);
+  const allProcs   = () => [...(props.data?.topProcs ?? [])]
+    .filter(p => p.cmd.trim().length > 0)
+    .sort((a, b) => b.memMB - a.memMB);
   const maxProcMem = () => Math.max(...allProcs().map(p => p.memMB), 1);
+
+  const procInfoMap = () => {
+    const m = new Map<string, string>();
+    for (const p of (props.data?.processes ?? [])) m.set(p.pid, p.args);
+    return m;
+  };
 
   const ramPctStr  = () => `${(usedPct() * 100).toFixed(0)}%`;
   const panelTitle = () => props.data
@@ -163,20 +171,28 @@ export function SystemPanel(props: Props) {
               const selected = () => props.focused && idx() === (props.selectedIndex ?? 0);
               const isInlineExpanded = () => idx() === (props.expandedIndex ?? -1);
               const color = procColor(proc.memMB);
+              const marker = () => selected() ? "▸ " : "  ";
+              const args = () => procInfoMap().get(proc.pid) ?? "";
               return (
                 <box flexDirection="column">
                   <box flexDirection="row" height={1} backgroundColor={selected() ? "#161b22" : undefined}>
-                    <text fg={selected() ? "#c9d1d9" : color}>{proc.cmd.slice(0, 12).padEnd(13)}</text>
+                    <text fg={selected() ? "#c9d1d9" : color}>{marker() + proc.cmd.slice(0, 11).padEnd(11)}</text>
                     <AnimatedBar pct={proc.memMB / maxProcMem()} width={procBarW()} fg={selected() ? "#c9d1d9" : color} emptyFg="#21262d" />
                     <text fg={selected() ? "#c9d1d9" : color}>{fmtMB(proc.memMB).padStart(5)}</text>
                   </box>
                   <Show when={isInlineExpanded()}>
                     <box flexDirection="row" height={1}>
                       <text fg="#4d5566">{"  pid "}</text>
-                      <text fg="#8b949e">{proc.pid.padEnd(7)}</text>
-                      <text fg="#4d5566">{"mem "}</text>
+                      <text fg="#8b949e">{proc.pid.padEnd(8)}</text>
+                      <text fg="#4d5566">{"raw "}</text>
                       <text fg={color}>{proc.mem}</text>
                     </box>
+                    <Show when={args().length > 0}>
+                      <box flexDirection="row" height={1}>
+                        <text fg="#4d5566">{"  cmd "}</text>
+                        <text fg="#6e7681">{args().slice(0, Math.max(10, panelW() - 8))}</text>
+                      </box>
+                    </Show>
                   </Show>
                 </box>
               );

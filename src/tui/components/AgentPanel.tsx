@@ -165,17 +165,19 @@ export function AgentPanel(props: Props) {
               <text fg="#4d5566">{"mem".padStart(6)}</text>
             </box>
 
-            <scrollbox flexGrow={1} focused={false} style={SCROLL_STYLE}>
+            <scrollbox flexGrow={1} focused={props.focused} style={SCROLL_STYLE}>
               <For each={sessions()}>
                 {(s, idx) => {
+                  const selected = () => props.focused && idx() === (props.selectedIndex ?? 0);
                   const pct   = () => s.totalMem / maxMem();
                   const color = () => memColor(pct(), s.totalMem);
                   const nW    = miniNameW();
                   const isInlineExpanded = () => idx() === (props.expandedIndex ?? -1);
+                  const nameLabel = () => (selected() ? "▸ " : "  ") + s.name.slice(0, nW - 3).padEnd(nW - 2);
                   return (
                     <box flexDirection="column">
-                      <box flexDirection="row" height={1}>
-                        <text fg="#c9d1d9">{"  " + s.name.slice(0, nW - 3).padEnd(nW - 2)}</text>
+                      <box flexDirection="row" height={1} backgroundColor={selected() ? "#161b22" : undefined}>
+                        <text fg={selected() ? "#e6edf3" : "#c9d1d9"}>{nameLabel()}</text>
                         <Show when={barWMini() >= 4}>
                           <text fg="#30363d"> </text>
                           <AnimatedBar pct={pct()} width={barWMini()} fg={color()} emptyFg="#21262d" />
@@ -184,14 +186,20 @@ export function AgentPanel(props: Props) {
                       </box>
                       <Show when={isInlineExpanded()}>
                         <box flexDirection="row" height={1}>
-                          <text fg="#4d5566">{"    project  "}</text>
-                          <text fg="#8b949e">{s.project.slice(0, Math.max(10, panelW() - 16))}</text>
+                          <text fg="#4d5566">{"  session  "}</text>
+                          <text fg="#8b949e">{s.name}</text>
                         </box>
                         <box flexDirection="row" height={1}>
-                          <text fg="#4d5566">{"    instances "}</text>
-                          <text fg="#8b949e">{String(s.instances)}</text>
-                          <text fg="#4d5566">{"  sidecars "}</text>
-                          <text fg="#4d5566">{String(s.sidecars)}</text>
+                          <text fg="#4d5566">{"  project  "}</text>
+                          <text fg="#8b949e">{s.project.slice(0, Math.max(10, panelW() - 13))}</text>
+                        </box>
+                        <box flexDirection="row" height={1}>
+                          <text fg="#4d5566">{"  claude   "}</text>
+                          <text fg="#3fb950">{String(s.instances)}x</text>
+                          <text fg="#4d5566">{"  mcp  "}</text>
+                          <text fg="#4d5566">{String(s.sidecars)}x</text>
+                          <text fg="#4d5566">{"  mem  "}</text>
+                          <text fg={color()}>{fmtMB(s.totalMem)}</text>
                         </box>
                       </Show>
                     </box>

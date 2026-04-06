@@ -44,9 +44,11 @@ export async function collectTopProcs(): Promise<TopProc[]> {
     .map((l) => {
       const parts = l.trim().split(/\s+/);
       if (parts.length < 3) return null;
-      const mem = parts[2];
+      const cmd = parts[1]?.trim() ?? "";
+      if (!cmd) return null;
+      const mem = parts[parts.length - 1];
       const memMB = mem.endsWith("G") ? parseFloat(mem) * 1024 : parseInt(mem) || 0;
-      return { pid: parts[0], cmd: parts[1], mem, memMB };
+      return { pid: parts[0], cmd, mem, memMB };
     })
     .filter(Boolean) as TopProc[];
 }
