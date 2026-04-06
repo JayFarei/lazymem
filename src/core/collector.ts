@@ -9,30 +9,51 @@ async function run(cmd: string[]): Promise<string> {
 }
 
 export async function collectSystem(): Promise<SystemInfo> {
-  const out = await run(["top", "-l", "1", "-o", "mem", "-n", "0"]);
-  const lines = out.split("\n");
-  const phys = lines.find((l) => l.includes("PhysMem")) ?? "";
-  const swapLine = lines.find((l) => l.startsWith("Swap:")) ?? "";
+  // hw.memsize: ground-truth physical RAM in bytes
+  const [vmstatOut, memsizeOut, swapOut] = await Promise.all([
+    run(["vm_stat"]),
+    run(["sysctl", "-n", "hw.memsize"]),
+    run(["sysctl", "-n", "vm.swapusage"]),
+  ]);
 
+  // Parse page size from "Mach Virtual Memory Statistics: (page size of N bytes)"
+  const pageSizeMatch = vmstatOut.match(/page size of (\d+) bytes/);
+  const pageSize = pageSizeMatch ? parseInt(pageSizeMatch[1]) : 16384;
+
+  // Extract page counts from vm_stat output
+  function pages(label: string): number {
+    const m = vmstatOut.match(new RegExp(`${label}:\\s+(\\d+)`));
+    return m ? parseInt(m[1]) : 0;
+  }
+  const freePages        = pages("Pages free");
+  const activePages      = pages("Pages active");
+  const inactivePages    = pages("Pages inactive");
+  const specPages        = pages("Pages speculative");
+  const wiredPages       = pages("Pages wired down");
+  const compPages        = pages("Pages occupied by compressor");
+  const purgeable        = pages("Pages purgeable");
+  const fileBacked       = pages("File-backed pages");
+  const anonymous        = pages("Anonymous pages");
+
+  const toMB = (p: number) => Math.round((p * pageSize) / (1024 * 1024));
+
+  const totalMB  = Math.round(parseInt(memsizeOut.trim()) / (1024 * 1024));
+  // Activity Monitor categories:
+  const appMB    = toMB(Math.max(0, anonymous - purgeable));
+  const wiredMB  = toMB(wiredPages);
+  const compMB   = toMB(compPages);
+  const cachedMB = toMB(fileBacked);
+  const freeMB   = toMB(Math.max(0, freePages - specPages));
+  const usedMB   = appMB + wiredMB + compMB;
+
+  // Swap: "vm.swapusage: total = 3.00G  used = 1.25G  free = 1.75G  ..."
   let swap: SystemInfo["swap"];
-  // "Swap: 2.00G + 1.00G free." -> used=2.00G free=1.00G
-  const swapM = swapLine.match(/Swap:\s*([\d.]+\s*[BKMG]i?B?)\s*\+\s*([\d.]+\s*[BKMG]i?B?)\s*free/i);
+  const swapM = swapOut.match(/total\s*=\s*([\d.]+[BKMG])\s+used\s*=\s*([\d.]+[BKMG])\s+free\s*=\s*([\d.]+[BKMG])/i);
   if (swapM) {
-    const used = swapM[1].replace(/\s+/, "");
-    const free = swapM[2].replace(/\s+/, "");
-    const usedN = parseFloat(used);
-    const freeN = parseFloat(free);
-    const totalRaw = used.replace(/[\d.]+/, (n) => String(usedN + freeN));
-    swap = { used, free, total: totalRaw };
+    swap = { total: swapM[1], used: swapM[2], free: swapM[3] };
   }
 
-  return {
-    used: phys.match(/PhysMem:\s+(\d+[GM])\s+used/)?.[1] ?? "?",
-    wired: phys.match(/\((\d+[GM])\s+wired/)?.[1] ?? "?",
-    compressor: phys.match(/[, ](\d+[GM])\s+compressor/)?.[1] ?? "?",
-    free: phys.match(/(\d+[GM])\s+unused/)?.[1] ?? "?",
-    swap,
-  };
+  return { totalMB, appMB, wiredMB, compMB, cachedMB, freeMB, usedMB, swap };
 }
 
 export async function collectTopProcs(): Promise<TopProc[]> {

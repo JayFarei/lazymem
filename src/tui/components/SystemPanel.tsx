@@ -14,12 +14,6 @@ interface Props {
   expandedIndex?: number;
 }
 
-function parseMem(s: string): number {
-  const n = parseFloat(s);
-  if (s.endsWith("G") || s.toLowerCase().includes("gb") || s.toLowerCase().includes("gib")) return n * 1024;
-  return n;
-}
-
 function fmtMB(mb: number): string {
   return mb >= 1024 ? `${(mb / 1024).toFixed(1)}G` : `${Math.round(mb)}M`;
 }
@@ -62,20 +56,30 @@ export function SystemPanel(props: Props) {
   // Proc row: name(13)+bar+mem(5) = 18+bar → bar = panelW-18
   const procBarW = () => Math.max(4, panelW() - 18);
 
-  const usedMB   = () => parseMem(props.data?.system.used  ?? "0");
-  const wiredMB  = () => parseMem(props.data?.system.wired ?? "0");
-  const compMB   = () => parseMem(props.data?.system.compressor ?? "0");
-  const freeMB   = () => parseMem(props.data?.system.free  ?? "0");
-  const totalMB  = () => Math.max(usedMB() + freeMB(), 1);
-  const usedPct  = () => usedMB() / totalMB();
-  const wiredPct = () => wiredMB() / totalMB();
-  const compPct  = () => compMB() / totalMB();
+  const sys       = () => props.data?.system;
+  const totalMB   = () => Math.max(sys()?.totalMB ?? 1, 1);
+  const usedMB    = () => sys()?.usedMB  ?? 0;
+  const wiredMB   = () => sys()?.wiredMB ?? 0;
+  const compMB    = () => sys()?.compMB  ?? 0;
+  const cachedMB  = () => sys()?.cachedMB ?? 0;
+  const freeMB    = () => sys()?.freeMB  ?? 0;
+  const appMB     = () => sys()?.appMB   ?? 0;
 
-  const swapUsedMB  = () => parseMem(props.data?.system.swap?.used  ?? "0");
-  const swapFreeMB  = () => parseMem(props.data?.system.swap?.free  ?? "0");
-  const swapTotalMB = () => swapUsedMB() + swapFreeMB();
-  const swapPct     = () => swapTotalMB() > 0 ? swapUsedMB() / swapTotalMB() : 0;
-  const hasSwap     = () => swapTotalMB() > 0;
+  const usedPct   = () => usedMB()   / totalMB();
+  const wiredPct  = () => wiredMB()  / totalMB();
+  const compPct   = () => compMB()   / totalMB();
+  const cachedPct = () => cachedMB() / totalMB();
+  const appPct    = () => appMB()    / totalMB();
+
+  const swapUsedStr = () => sys()?.swap?.used  ?? "";
+  const swapTotStr  = () => sys()?.swap?.total ?? "";
+  const swapFreeStr = () => sys()?.swap?.free  ?? "";
+  // Swap pct from string values (e.g. "1.25G" / "3.00G")
+  const parseSwapG  = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : n; };
+  const swapPct     = () => {
+    const tot = parseSwapG(swapTotStr()); return tot > 0 ? parseSwapG(swapUsedStr()) / tot : 0;
+  };
+  const hasSwap     = () => parseSwapG(swapTotStr()) > 0;
 
   const allProcs   = () => [...(props.data?.topProcs ?? [])]
     .filter(p => p.cmd.trim().length > 0)
@@ -90,7 +94,7 @@ export function SystemPanel(props: Props) {
 
   const ramPctStr  = () => `${(usedPct() * 100).toFixed(0)}%`;
   const panelTitle = () => props.data
-    ? ` [1] sys  ${props.data.system.used} · ${ramPctStr()} `
+    ? ` [1] sys  ${fmtMB(usedMB())}/${fmtMB(totalMB())} · ${ramPctStr()} `
     : " [1] sys ";
 
   const alerts = () => props.anomalies ?? [];
@@ -121,35 +125,47 @@ export function SystemPanel(props: Props) {
             <text fg={titleColor()}>{"RAM ".padEnd(6)}</text>
             <text fg={ramColor(usedPct())}>{ramPctStr().padStart(4)}  </text>
             <AnimatedBar pct={usedPct()} width={memBarW()} fg={ramColor(usedPct())} emptyFg="#21262d" />
-            <text fg="#8b949e">  {fmtMB(usedMB())}/{fmtMB(totalMB())}</text>
+            <text fg="#8b949e">  {fmtMB(usedMB())}/{fmtMB(totalMB())} </text>
           </box>
           {/* Breakdown rows — magnified only */}
           <Show when={props.expanded}>
             <box flexDirection="row" height={1}>
+              <text fg="#4d5566">{"app".padEnd(6)}</text>
+              <text fg="#8b949e">{"".padStart(6)}</text>
+              <AnimatedBar pct={appPct()} width={memBarW()} fg="#58a6ff" emptyFg="#21262d" />
+              <text fg="#4d5566">  {fmtMB(appMB())}</text>
+            </box>
+            <box flexDirection="row" height={1}>
               <text fg="#4d5566">{"wired".padEnd(6)}</text>
               <text fg="#8b949e">{"".padStart(6)}</text>
               <AnimatedBar pct={wiredPct()} width={memBarW()} fg="#4d5566" emptyFg="#21262d" />
-              <text fg="#4d5566">  {props.data!.system.wired}</text>
+              <text fg="#4d5566">  {fmtMB(wiredMB())}</text>
             </box>
             <box flexDirection="row" height={1}>
               <text fg="#4d5566">{"comp".padEnd(6)}</text>
               <text fg="#8b949e">{"".padStart(6)}</text>
               <AnimatedBar pct={compPct()} width={memBarW()} fg="#4d5566" emptyFg="#21262d" />
-              <text fg="#4d5566">  {props.data!.system.compressor}</text>
+              <text fg="#4d5566">  {fmtMB(compMB())}</text>
+            </box>
+            <box flexDirection="row" height={1}>
+              <text fg="#4d5566">{"cached".padEnd(6)}</text>
+              <text fg="#8b949e">{"".padStart(6)}</text>
+              <AnimatedBar pct={cachedPct()} width={memBarW()} fg="#2d333b" emptyFg="#21262d" />
+              <text fg="#4d5566">  {fmtMB(cachedMB())}</text>
             </box>
             <Show when={hasSwap()}>
               <box flexDirection="row" height={1}>
                 <text fg={swapPct() > 0.5 ? "#d29922" : "#4d5566"}>{"swap".padEnd(6)}</text>
                 <text fg="#8b949e">{"".padStart(6)}</text>
                 <AnimatedBar pct={swapPct()} width={memBarW()} fg={swapPct() > 0.5 ? "#d29922" : "#4d5566"} emptyFg="#21262d" />
-                <text fg={swapPct() > 0.5 ? "#d29922" : "#4d5566"}>  {props.data!.system.swap!.used}/{props.data!.system.swap!.total}</text>
+                <text fg={swapPct() > 0.5 ? "#d29922" : "#4d5566"}>  {swapUsedStr()}/{swapTotStr()}</text>
               </box>
             </Show>
             <box flexDirection="row" height={1}>
               <text fg="#4d5566">{"free".padEnd(6)}</text>
               <text fg="#8b949e">{"".padStart(6)}</text>
-              <AnimatedBar pct={1 - usedPct()} width={memBarW()} fg="#2d333b" emptyFg="#21262d" />
-              <text fg="#4d5566">  {props.data!.system.free}</text>
+              <AnimatedBar pct={freeMB() / totalMB()} width={memBarW()} fg="#2d333b" emptyFg="#21262d" />
+              <text fg="#4d5566">  {fmtMB(freeMB())}</text>
             </box>
           </Show>
         </box>
