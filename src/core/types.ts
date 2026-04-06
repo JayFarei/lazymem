@@ -45,7 +45,8 @@ export interface DockerInfo {
 export interface SessionSummary {
   name: string;
   project: string;
-  instances: number;
+  instances: number;     // claude processes
+  codexInstances: number;
   sidecars: number;
   totalMem: number;
 }

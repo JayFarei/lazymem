@@ -147,6 +147,10 @@ function isClaude(cmd: string): boolean {
   return cmd === "claude" || cmd.includes("claude");
 }
 
+function isCodexAgent(cmd: string, args: string): boolean {
+  return !isClaude(cmd) && !isSidecar(args) && args.toLowerCase().includes("codex");
+}
+
 export function buildSessions(
   processes: ProcessInfo[],
   tmux: TmuxPane[],
@@ -156,36 +160,45 @@ export function buildSessions(
     ttyMap.set(pane.tty.replace("/dev/", ""), { session: pane.session, path: pane.path });
   }
 
-  const sessionMap = new Map<string, { project: string; claudes: number; sidecars: number; mem: number }>();
+  const sessionMap = new Map<string, { project: string; claudes: number; codex: number; sidecars: number; mem: number }>();
   for (const proc of processes) {
     if (proc.tty === "??" || !proc.tty) continue;
     const info = ttyMap.get(proc.tty);
     if (!info) continue;
 
-    const entry = sessionMap.get(info.session) ?? { project: "", claudes: 0, sidecars: 0, mem: 0 };
+    const entry = sessionMap.get(info.session) ?? { project: "", claudes: 0, codex: 0, sidecars: 0, mem: 0 };
     if (!entry.project) {
       const parts = info.path.split("/");
       entry.project = parts[parts.length - 1] || parts[parts.length - 2] || info.path;
     }
     entry.mem += proc.mem;
-    if (isClaude(proc.cmd)) entry.claudes++;
-    else if (isSidecar(proc.args)) entry.sidecars++;
+    if (isClaude(proc.cmd))                entry.claudes++;
+    else if (isCodexAgent(proc.cmd, proc.args)) entry.codex++;
+    else if (isSidecar(proc.args))         entry.sidecars++;
     sessionMap.set(info.session, entry);
   }
 
   const sessions: SessionSummary[] = [...sessionMap.entries()]
-    .map(([name, v]) => ({ name, project: v.project, instances: v.claudes, sidecars: v.sidecars, totalMem: v.mem }))
-    .filter((s) => s.instances > 0)
+    .map(([name, v]) => ({
+      name,
+      project:        v.project,
+      instances:      v.claudes,
+      codexInstances: v.codex,
+      sidecars:       v.sidecars,
+      totalMem:       v.mem,
+    }))
+    .filter((s) => s.instances > 0 || s.codexInstances > 0)
     .sort((a, b) => b.totalMem - a.totalMem);
 
   const anomalies: Anomaly[] = [];
   for (const s of sessions) {
-    if (s.instances > 3) {
-      anomalies.push({ text: `${s.name}: ${s.instances} instances (${fmtMB(s.totalMem)})`, severity: "error" });
+    const total = s.instances + s.codexInstances;
+    if (total > 4) {
+      anomalies.push({ text: `${s.name}: ${s.instances}c+${s.codexInstances}x agents (${fmtMB(s.totalMem)})`, severity: "error" });
     }
   }
 
-  const totalInstances = sessions.reduce((s, x) => s + x.instances, 0);
+  const totalInstances = sessions.reduce((s, x) => s + x.instances + x.codexInstances, 0);
   const totalClaudeMem = sessions.reduce((s, x) => s + x.totalMem, 0);
 
   return { sessions, anomalies, totalInstances, totalClaudeMem };

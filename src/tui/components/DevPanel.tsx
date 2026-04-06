@@ -17,6 +17,9 @@ const isSidecar = (args: string) =>
   args.includes("qmd mcp") || (args.includes("codex") && args.includes("mcp-server"));
 
 function classify(cmd: string, args: string): string {
+  // Agent harnesses — classified before dev-server heuristics
+  if (cmd === "claude" || cmd.includes("claude"))              return "claude";
+  if (args.toLowerCase().includes("codex"))                    return "codex";
   if (args.includes("next"))                 return "next";
   if (args.includes("vite"))                 return "vite";
   if (args.includes("tailwindcss-language")) return "tailwind-lsp";
@@ -101,7 +104,7 @@ export function DevPanel(props: Props) {
     }
     const byLabel = new Map<string, Map<string, { count: number; mem: number }>>();
     for (const p of (props.data?.processes ?? []).filter(
-      (p) => !isSidecar(p.args) && p.cmd !== "claude" && p.mem > 20
+      (p) => !isSidecar(p.args) && p.mem > 20
         && (p.tty === "??" || ttyToSession.has(p.tty))
     )) {
       const type = classify(p.cmd, p.args);

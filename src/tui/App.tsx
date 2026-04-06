@@ -50,14 +50,16 @@ export function App() {
         const ttySet = new Set(d.tmux.map(p => p.tty.replace("/dev/", "")));
         const types = new Set(
           d.processes
-            .filter(p => !isSC(p.args) && p.cmd !== "claude" && p.mem > 20 && (p.tty === "??" || ttySet.has(p.tty)))
+            .filter(p => !isSC(p.args) && p.mem > 20 && (p.tty === "??" || ttySet.has(p.tty)))
             .map(p => {
-              const a = p.args;
-              if (a.includes("next")) return "next";
-              if (a.includes("vite")) return "vite";
-              if (a.includes("tailwindcss-language")) return "tailwind-lsp";
-              if (a.includes("typescript-language")) return "ts-lsp";
-              return p.cmd.split("/").pop() ?? p.cmd;
+              const cmd = p.cmd; const a = p.args;
+              if (cmd === "claude" || cmd.includes("claude")) return "claude";
+              if (a.toLowerCase().includes("codex"))          return "codex";
+              if (a.includes("next"))                         return "next";
+              if (a.includes("vite"))                         return "vite";
+              if (a.includes("tailwindcss-language"))         return "tailwind-lsp";
+              if (a.includes("typescript-language"))          return "ts-lsp";
+              return cmd.split("/").pop() ?? cmd;
             })
         );
         return Math.min(types.size, 12);

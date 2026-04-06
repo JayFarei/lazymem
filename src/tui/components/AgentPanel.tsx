@@ -13,9 +13,6 @@ interface Props {
   expandedIndex?: number;
 }
 
-const isSidecar = (args: string) =>
-  args.includes("qmd mcp") || (args.includes("codex") && args.includes("mcp-server"));
-
 function fmtMB(mb: number): string {
   return mb >= 1024 ? `${(mb / 1024).toFixed(1)}G` : `${Math.round(mb)}M`;
 }
@@ -59,17 +56,13 @@ export function AgentPanel(props: Props) {
   const totalInst = () => props.data?.totalInstances ?? 0;
   const totalMem  = () => props.data?.totalClaudeMem ?? 0;
 
-  const codexProcs = () =>
-    (props.data?.processes ?? []).filter(
-      p => !isSidecar(p.args) && p.args.toLowerCase().includes("codex") && p.cmd !== "claude"
-    );
-  const codexMem = () => codexProcs().reduce((s, p) => s + p.mem, 0);
-  const hasCodex = () => codexProcs().length > 0;
-
   const panelTitle = () => {
     if (!props.data) return " [2] agents ";
-    const parts = [`[2] agents  ${totalInst()}x · ${fmtMB(totalMem())}`];
-    if (hasCodex()) parts.push(`codex ${codexProcs().length}x`);
+    const claudeN = sessions().reduce((n, s) => n + s.instances, 0);
+    const codexN  = sessions().reduce((n, s) => n + s.codexInstances, 0);
+    const parts = [`[2] agents  ${fmtMB(totalMem())}`];
+    if (claudeN > 0) parts.push(`claude ${claudeN}x`);
+    if (codexN  > 0) parts.push(`codex ${codexN}x`);
     return ` ${parts.join("  ")} `;
   };
 
@@ -116,42 +109,57 @@ export function AgentPanel(props: Props) {
               <For each={sessions()}>
                 {(s, idx) => {
                   const selected = () => idx() === (props.selectedIndex ?? 0);
+                  const isInlineExpanded = () => idx() === (props.expandedIndex ?? -1);
                   const pct   = () => s.totalMem / maxMem();
                   const color = () => memColor(pct(), s.totalMem);
                   const sW    = sessionW();
                   const pW    = projectW();
+                  const totalAgents = () => s.instances + s.codexInstances;
                   return (
-                    <box flexDirection="row" height={1} backgroundColor={selected() ? "#161b22" : undefined}>
-                      <text fg={selected() ? "#e6edf3" : "#c9d1d9"}>
-                        {(selected() ? "▸ " : "  ") + s.name.slice(0, sW - 1).padEnd(sW)}
-                      </text>
-                      <text fg="#8b949e">{s.project.slice(0, pW).padEnd(pW)}</text>
-                      <text fg="#8b949e">{String(s.instances).padStart(3)}  </text>
-                      <text fg={color()}>{fmtMB(s.totalMem).padStart(6)}  </text>
-                      <Show when={barWMag() >= 4}>
-                        <AnimatedBar pct={pct()} width={barWMag()} fg={color()} emptyFg="#21262d" />
+                    <box flexDirection="column">
+                      <box flexDirection="row" height={1} backgroundColor={selected() ? "#161b22" : undefined}>
+                        <text fg={selected() ? "#e6edf3" : "#c9d1d9"}>
+                          {(selected() ? "▸ " : "  ") + s.name.slice(0, sW - 1).padEnd(sW)}
+                        </text>
+                        <text fg="#8b949e">{s.project.slice(0, pW).padEnd(pW)}</text>
+                        <text fg="#8b949e">{String(totalAgents()).padStart(3)}  </text>
+                        <text fg={color()}>{fmtMB(s.totalMem).padStart(6)}  </text>
+                        <Show when={barWMag() >= 4}>
+                          <AnimatedBar pct={pct()} width={barWMag()} fg={color()} emptyFg="#21262d" />
+                        </Show>
+                      </box>
+                      <Show when={isInlineExpanded()}>
+                        <box flexDirection="row" height={1}>
+                          <text fg="#4d5566">{"    project  "}</text>
+                          <text fg="#8b949e">{s.project.slice(0, Math.max(10, panelW() - 15))}</text>
+                        </box>
+                        <Show when={s.instances > 0}>
+                          <box flexDirection="row" height={1}>
+                            <text fg="#4d5566">{"    claude   "}</text>
+                            <text fg="#3fb950">{s.instances}x</text>
+                          </box>
+                        </Show>
+                        <Show when={s.codexInstances > 0}>
+                          <box flexDirection="row" height={1}>
+                            <text fg="#4d5566">{"    codex    "}</text>
+                            <text fg="#8957e5">{s.codexInstances}x</text>
+                          </box>
+                        </Show>
+                        <Show when={s.sidecars > 0}>
+                          <box flexDirection="row" height={1}>
+                            <text fg="#4d5566">{"    mcp      "}</text>
+                            <text fg="#4d5566">{s.sidecars}x</text>
+                          </box>
+                        </Show>
+                        <box flexDirection="row" height={1}>
+                          <text fg="#4d5566">{"    mem      "}</text>
+                          <text fg={color()}>{fmtMB(s.totalMem)}</text>
+                        </box>
                       </Show>
                     </box>
                   );
                 }}
               </For>
-
-              <Show when={hasCodex()}>
-                <box flexDirection="row" height={1}>
-                  <text fg="#8957e5">{"  codex".padEnd(sessionW() + 2)}</text>
-                  <text fg="#4d5566">{"".padEnd(projectW())}</text>
-                  <text fg="#8b949e">{String(codexProcs().length).padStart(3)}  </text>
-                  <text fg="#8957e5">{fmtMB(codexMem()).padStart(6)}  </text>
-                  <Show when={barWMag() >= 4}>
-                    <AnimatedBar
-                      pct={codexMem() / Math.max(maxMem(), codexMem())}
-                      width={barWMag()}
-                      fg="#8957e5"
-                      emptyFg="#21262d"
-                    />
-                  </Show>
-                </box>
-              </Show>
             </scrollbox>
           </Show>
 
@@ -186,19 +194,29 @@ export function AgentPanel(props: Props) {
                       </box>
                       <Show when={isInlineExpanded()}>
                         <box flexDirection="row" height={1}>
-                          <text fg="#4d5566">{"  session  "}</text>
-                          <text fg="#8b949e">{s.name}</text>
-                        </box>
-                        <box flexDirection="row" height={1}>
                           <text fg="#4d5566">{"  project  "}</text>
                           <text fg="#8b949e">{s.project.slice(0, Math.max(10, panelW() - 13))}</text>
                         </box>
+                        <Show when={s.instances > 0}>
+                          <box flexDirection="row" height={1}>
+                            <text fg="#4d5566">{"  claude   "}</text>
+                            <text fg="#3fb950">{s.instances}x</text>
+                          </box>
+                        </Show>
+                        <Show when={s.codexInstances > 0}>
+                          <box flexDirection="row" height={1}>
+                            <text fg="#4d5566">{"  codex    "}</text>
+                            <text fg="#8957e5">{s.codexInstances}x</text>
+                          </box>
+                        </Show>
+                        <Show when={s.sidecars > 0}>
+                          <box flexDirection="row" height={1}>
+                            <text fg="#4d5566">{"  mcp      "}</text>
+                            <text fg="#4d5566">{s.sidecars}x</text>
+                          </box>
+                        </Show>
                         <box flexDirection="row" height={1}>
-                          <text fg="#4d5566">{"  claude   "}</text>
-                          <text fg="#3fb950">{String(s.instances)}x</text>
-                          <text fg="#4d5566">{"  mcp  "}</text>
-                          <text fg="#4d5566">{String(s.sidecars)}x</text>
-                          <text fg="#4d5566">{"  mem  "}</text>
+                          <text fg="#4d5566">{"  mem      "}</text>
                           <text fg={color()}>{fmtMB(s.totalMem)}</text>
                         </box>
                       </Show>
@@ -206,22 +224,6 @@ export function AgentPanel(props: Props) {
                   );
                 }}
               </For>
-
-              <Show when={hasCodex()}>
-                <box flexDirection="row" height={1}>
-                  <text fg="#8957e5">{"  codex".padEnd(miniNameW())}</text>
-                  <Show when={barWMini() >= 4}>
-                    <text fg="#30363d"> </text>
-                    <AnimatedBar
-                      pct={codexMem() / Math.max(maxMem(), codexMem())}
-                      width={barWMini()}
-                      fg="#8957e5"
-                      emptyFg="#21262d"
-                    />
-                  </Show>
-                  <text fg="#8957e5">{fmtMB(codexMem()).padStart(6)}</text>
-                </box>
-              </Show>
             </scrollbox>
           </Show>
         </Show>
