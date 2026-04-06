@@ -17,6 +17,16 @@ interface Props {
 // codex-mcp-server is shown as its own service group so its memory is visible.
 const isSidecar = (args: string) => args.includes("qmd mcp");
 
+// Known dev tool types returned by classify(). Anything not in this set is a
+// raw-cmd fallback (Obsidian, Chrome helpers, Spark, etc.) and should only be
+// shown if the process is attached to a tmux pane — not as a background daemon.
+const KNOWN_DEV_TYPES = new Set([
+  "claude", "codex-mcp", "codex",
+  "next", "vite", "tsx", "postcss", "pnpm",
+  "tailwind-lsp", "ts-lsp",
+  "python", "surf-cli", "qmd", "telegram",
+]);
+
 function classify(cmd: string, args: string): string {
   // Agent harnesses — classified before dev-server heuristics
   if (cmd === "claude" || cmd.includes("claude"))                          return "claude";
@@ -105,11 +115,17 @@ export function DevPanel(props: Props) {
       if (folder) pathToSession.set(folder, pane.session);
     }
     const byLabel = new Map<string, Map<string, { count: number; mem: number }>>();
-    for (const p of (props.data?.processes ?? []).filter(
-      (p) => !isSidecar(p.args) && p.mem > 20
-        && (p.tty === "??" || ttyToSession.has(p.tty))
-    )) {
+    for (const p of (props.data?.processes ?? [])) {
+      if (isSidecar(p.args) || p.mem <= 20) continue;
+      const inTmux  = ttyToSession.has(p.tty);
+      const isBackground = p.tty === "??";
+      if (!inTmux && !isBackground) continue;
+
       const type = classify(p.cmd, p.args);
+      // Background processes with no tmux pane must be a recognized dev type.
+      // Electron apps (Obsidian, Spark, Chrome helpers) also run with tty=??
+      // and may match the node/claude filter — reject them via the raw-cmd fallback.
+      if (isBackground && !inTmux && !KNOWN_DEV_TYPES.has(type)) continue;
       const folder = extractService(p.args);
       const svc  = ttyToSession.get(p.tty) ?? pathToSession.get(folder) ?? folder;
       if (!byLabel.has(type)) byLabel.set(type, new Map());

@@ -208,6 +208,8 @@ export function buildSessions(
     const total = s.instances + s.codexInstances;
     if (total > 4) {
       anomalies.push({ text: `${s.name}: ${s.instances}c+${s.codexInstances}x agents (${fmtMB(s.totalMem)})`, severity: "error" });
+    } else if (total >= 3) {
+      anomalies.push({ text: `${s.name}: ${s.instances}c+${s.codexInstances}x agents (${fmtMB(s.totalMem)})`, severity: "warning" });
     }
   }
 

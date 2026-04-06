@@ -60,7 +60,8 @@ export function SystemPanel(props: Props) {
     : Math.max(6, panelW() - 25);
   // Proc section: name column wider in expanded, bar fills remaining space
   const procNameW = () => props.expanded ? Math.min(20, Math.max(14, panelW() - 30)) : 11;
-  const procBarW  = () => Math.max(4, panelW() - procNameW() - 9);
+  // subtract 1 for scrollbar (always visible, locked below) + 1 for name/bar gap
+  const procBarW  = () => Math.max(4, panelW() - procNameW() - 11);
 
   const sys       = () => props.data?.system;
   const totalMB   = () => Math.max(sys()?.totalMB ?? 1, 1);
@@ -206,7 +207,10 @@ export function SystemPanel(props: Props) {
           <text fg="#4d5566">{allProcs().length}</text>
         </box>
 
-        <scrollbox flexGrow={1} focused={props.focused} style={SCROLL_STYLE}>
+        <scrollbox
+          ref={(el: any) => { el?.verticalScrollBar && (el.verticalScrollBar.visible = true); }}
+          flexGrow={1} focused={props.focused} style={SCROLL_STYLE}
+        >
           <For each={allProcs()}>
             {(proc, idx) => {
               const selected = () => props.focused && idx() === (props.selectedIndex ?? 0);
@@ -219,6 +223,7 @@ export function SystemPanel(props: Props) {
                 <box flexDirection="column">
                   <box flexDirection="row" height={1} backgroundColor={selected() ? "#161b22" : undefined}>
                     <text fg={selected() ? "#c9d1d9" : color}>{marker() + proc.cmd.slice(0, nameW).padEnd(nameW)}</text>
+                    <text fg="#30363d">{" "}</text>
                     <AnimatedBar pct={proc.memMB / maxProcMem()} width={procBarW()} fg={selected() ? "#c9d1d9" : color} emptyFg="#21262d" />
                     <text fg={selected() ? "#c9d1d9" : color}>{fmtMB(proc.memMB).padStart(5)}</text>
                   </box>
