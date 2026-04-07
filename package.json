@@ -1,19 +1,36 @@
 {
-  "name": "lazymem-flat",
-  "private": true,
+  "name": "lazymem",
+  "version": "0.1.0",
+  "description": "Terminal UI memory monitor for macOS dev environments",
   "type": "module",
+  "license": "MIT",
+  "author": "JayFarei",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JayFarei/lazymem.git"
+  },
+  "homepage": "https://github.com/JayFarei/lazymem",
+  "keywords": ["memory", "monitor", "tui", "macos", "bun", "terminal", "devtools"],
+  "bin": {
+    "lazymem": "./bin/lazymem"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "skill/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "bun": ">=1.0.0"
+  },
   "scripts": {
-    "dev": "bun --preload=./node_modules/@opentui/solid/scripts/preload.ts src/index.tsx"
+    "dev": "bun --preload=./node_modules/@opentui/solid/scripts/preload.ts src/index.tsx",
+    "start": "bun --preload=./node_modules/@opentui/solid/scripts/preload.ts src/index.tsx"
   },
   "dependencies": {
     "@opentui/core": "0.1.77",
     "@opentui/solid": "0.1.77",
     "solid-js": "1.9.11"
-  },
-  "devDependencies": {
-    "@babel/core": "^7.29.0",
-    "@babel/preset-typescript": "^7.28.5",
-    "babel-plugin-module-resolver": "^5.0.3",
-    "babel-preset-solid": "^1.9.12"
   }
 }

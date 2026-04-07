@@ -2,3 +2,13 @@ node_modules/
 dist/
 .DS_Store
 scripts/captures/
+.env*
+*.log
+.idea/
+.vscode/
+*.swp
+*.swo
+.agents/
+.claude/
+skills-lock.json
+kb/
