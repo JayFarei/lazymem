@@ -13,7 +13,7 @@ If you're running multiple Claude/Codex agents across tmux sessions, a handful o
 
 ## What it does
 
-- **System panel** - RAM breakdown (app, wired, compressor, cached, swap), top processes by RSS, anomaly alerts
+- **System panel** - RAM breakdown (app, wired, compressor, cached, swap), top processes, anomaly alerts
 - **Agent panel** - Claude and Codex instances grouped by tmux session, with per-session memory totals
 - **Dev panel** - Node, Bun, Python, LSPs, and other dev processes grouped by type
 - **Docker panel** - Container stats, Colima VM allocation vs actual use
