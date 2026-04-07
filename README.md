@@ -1,4 +1,11 @@
-# lazymem
+```
+ _                    __  __                
+| |    __ _ _____   _|  \/  | ___ _ __ ___  
+| |   / _` |_  / | | | |\/| |/ _ \ '_ ` _ \ 
+| |__| (_| |/ /| |_| | |  | |  __/ | | | | |
+|_____\__,_/___|\__, |_|  |_|\___|_| |_| |_|
+                |___/                        
+```
 
 Terminal UI memory monitor for macOS dev environments. Built with [Bun](https://bun.sh) and [@opentui/solid](https://github.com/nicholasgasior/opentui).
 
