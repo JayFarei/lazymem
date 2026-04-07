@@ -33,4 +33,16 @@ SCRIPT="$(resolve_link "$0")"
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT")" && pwd)"
 PACKAGE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-exec bun --preload="$PACKAGE_DIR/node_modules/@opentui/solid/scripts/preload.ts" "$PACKAGE_DIR/src/index.tsx" "$@"
+# Find preload script: nested node_modules (npm) or hoisted (bun global)
+PRELOAD="$PACKAGE_DIR/node_modules/@opentui/solid/scripts/preload.ts"
+if [ ! -f "$PRELOAD" ]; then
+  # bun hoists deps to the global node_modules root
+  PRELOAD="$(cd "$PACKAGE_DIR/.." && pwd)/@opentui/solid/scripts/preload.ts"
+fi
+if [ ! -f "$PRELOAD" ]; then
+  echo "lazymem: could not find @opentui/solid preload script" >&2
+  echo "Try reinstalling: bun install -g lazymem" >&2
+  exit 1
+fi
+
+exec bun --preload="$PRELOAD" "$PACKAGE_DIR/src/index.tsx" "$@"
