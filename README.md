@@ -7,11 +7,36 @@
                 |___/                        
 ```
 
-Terminal UI memory monitor for macOS dev environments. Built with [Bun](https://bun.sh) and [@opentui/solid](https://github.com/nicholasgasior/opentui).
-
-Tracks system memory, per-process RSS, Claude/Codex agent sessions, Node/dev tools, Docker containers, and swap pressure in a single dashboard.
+If you're running multiple Claude/Codex agents across tmux sessions, a handful of dev servers, and Docker containers on the side, your Mac's memory disappears fast. lazymem gives you a single dashboard to see where it's all going, and an agent-native way to clean it up.
 
 ![lazymem screenshot](screenshot.png)
+
+## What it does
+
+- **System panel** - RAM breakdown (app, wired, compressor, cached, swap), top processes by RSS, anomaly alerts
+- **Agent panel** - Claude and Codex instances grouped by tmux session, with per-session memory totals
+- **Dev panel** - Node, Bun, Python, LSPs, and other dev processes grouped by type
+- **Docker panel** - Container stats, Colima VM allocation vs actual use
+- **Prince Edmund** - An animated companion who comments on your memory situation (contextual to live state)
+
+## Agent-native memory management
+
+lazymem is designed to work alongside AI coding agents. Press `c` to copy a structured snapshot to your clipboard, then paste it into Claude Code. The snapshot includes PIDs, session mappings, and memory values your agent can act on directly.
+
+For a fully integrated workflow, install the companion skill:
+
+```sh
+mkdir -p ~/.claude/skills/lazymem
+cp node_modules/lazymem/skill/SKILL.md ~/.claude/skills/lazymem/SKILL.md
+```
+
+Then use `/lazymem` in Claude Code to:
+- Collect live memory state across all your sessions
+- Identify which agents and dev servers are using the most RAM
+- Kill idle agents, stop containers, or purge cache with confirmation prompts
+- See before/after memory deltas after each operation
+
+The skill can also parse lazymem snapshots directly, so you don't need to wait for a fresh collection.
 
 ## Install
 
@@ -45,31 +70,19 @@ bun install
 bun run dev
 ```
 
-## Usage
-
-```sh
-lazymem
-```
-
-### Keybindings
+## Keybindings
 
 | Key | Action |
 |-----|--------|
 | `q` | Quit |
-| `c` | Copy snapshot to clipboard (for AI-assisted memory management) |
+| `c` | Copy snapshot to clipboard |
 | `Tab` | Cycle panels |
-| Arrow keys | Scroll within panel |
-
-## Claude Code Skill (optional)
-
-lazymem ships with a companion Claude Code skill that lets your AI assistant manage memory using TUI snapshots. To install:
-
-```sh
-mkdir -p ~/.claude/skills/lazymem
-cp node_modules/lazymem/skill/SKILL.md ~/.claude/skills/lazymem/SKILL.md
-```
-
-Then use `/lazymem` in Claude Code to collect memory state, analyze pressure, and perform safe cleanup operations.
+| `1-4` | Jump to panel |
+| `j/k` | Navigate rows |
+| `Enter` | Expand row details |
+| `g` | Fullscreen panel |
+| `r` | Force refresh |
+| `?` | Help overlay |
 
 ## Requirements
 
