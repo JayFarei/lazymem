@@ -1,6 +1,7 @@
 import { createSignal, createMemo, onCleanup } from "solid-js";
 import type { AuditData } from "../../core/types";
 import { getBuddyState } from "../buddyQuips";
+import type { Mood } from "../buddyQuips";
 
 interface Props {
   data: AuditData | null;
@@ -8,15 +9,11 @@ interface Props {
 }
 
 // ── Prince Edmund ──────────────────────────────────────────────────
-// Species: royal  |  Eyes: *  |  Hat: crown
-// A bumbling prince who believes every memory crisis can be solved
-// with a cunning plan. Animated using the buddy-crack sprite system:
-// 5-line frames, 12 chars wide, {E} eye placeholder, 15-step idle
-// sequence at 500ms ticks.
+// Animated using buddy-crack sprite system: 5-line x 12-char frames,
+// {E} eye placeholder, 15-step idle sequence at 500ms.
+// Quip rotation is decoupled from data refresh to prevent flicker.
 
-// ── Sprite frames (5 lines x 12 chars each) ───────────────────────
-// Line 0 = hat slot (blank unless hat/effect)
-// Lines 1-4 = body
+// ── Sprite frames ──────────────────────────────────────────────────
 
 const FRAMES = [
   // Frame 0: rest
@@ -27,7 +24,7 @@ const FRAMES = [
     ' (  .__.  ) ',
     '  `------´  ',
   ],
-  // Frame 1: fidget (eyebrow raise, smirk)
+  // Frame 1: fidget (smirk)
   [
     '   \\^^^/    ',
     '  .------.  ',
@@ -35,7 +32,7 @@ const FRAMES = [
     ' (  .__>  ) ',
     '  `------´  ',
   ],
-  // Frame 2: special (plotting, hand raised)
+  // Frame 2: special (plotting)
   [
     '   \\^^^/ o  ',
     '  .------.  ',
@@ -45,30 +42,22 @@ const FRAMES = [
   ],
 ];
 
-const EYE = '*';
-const BLINK_EYE = '-';
 const SPRITE_W = 12;
 
-// Mood affects eye character and color, not sprite shape
 const MOOD_EYES: Record<string, string> = {
-  chill:   '*',
-  wary:    'o',
-  alarmed: 'O',
-  crisis:  'x',
+  chill: '*', wary: 'o', alarmed: 'O', crisis: 'x',
 };
 
 const MOOD_COLORS: Record<string, string> = {
-  chill:   '#d29922',  // gold (legendary rarity color)
-  wary:    '#d29922',
-  alarmed: '#f0883e',
-  crisis:  '#f85149',
+  chill: '#d29922', wary: '#d29922', alarmed: '#f0883e', crisis: '#f85149',
 };
 
-// 15-step idle sequence from the buddy system: 0=rest, 1=fidget, 2=special, -1=blink
+// 15-step idle sequence: 0=rest, 1=fidget, 2=special, -1=blink
 const IDLE_SEQ = [0, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 2, 0, 0, 0];
-const TICK_MS = 500;
+const ANIM_MS = 500;
+const QUIP_MS = 20_000; // rotate quip every 20s (independent of data refresh)
 
-// ── Speech bubble builder ──────────────────────────────────────────
+// ── Speech bubble ──────────────────────────────────────────────────
 
 function wrapText(text: string, maxW: number): string[] {
   const words = text.split(' ');
@@ -89,7 +78,6 @@ function wrapText(text: string, maxW: number): string[] {
 function buildBubble(text: string, maxW: number): string[] {
   const wrapped = wrapText(text, maxW);
   const w = Math.max(maxW, ...wrapped.map(l => l.length));
-  // Pointer on line 1 connects bubble to character
   const top = ` .${'-'.repeat(w + 2)}.`;
   const ptr = `<  ${wrapped[0]?.padEnd(w) ?? ''.padEnd(w)}  |`;
   const mid = wrapped.slice(1).map(l => `|  ${l.padEnd(w)}  |`);
@@ -100,47 +88,51 @@ function buildBubble(text: string, maxW: number): string[] {
 // ── Component ──────────────────────────────────────────────────────
 
 export function BuddyPanel(props: Props) {
+  // Animation tick (500ms) — drives sprite frames
   const [tick, setTick] = createSignal(0);
-  const timer = setInterval(() => setTick(t => t + 1), TICK_MS);
-  onCleanup(() => clearInterval(timer));
+  const animTimer = setInterval(() => setTick(t => t + 1), ANIM_MS);
+  onCleanup(() => clearInterval(animTimer));
 
-  // Quip only updates when data changes (not on animation tick)
+  // Quip rotation tick (20s) — drives which quip from the pool is shown
+  const [quipIdx, setQuipIdx] = createSignal(0);
+  const quipTimer = setInterval(() => setQuipIdx(i => i + 1), QUIP_MS);
+  onCleanup(() => clearInterval(quipTimer));
+
+  // Mood + pool recompute when data changes (instant, no flicker)
   const buddy = createMemo(() => getBuddyState(props.data));
-  const mood = createMemo(() => buddy().mood);
+  const mood = createMemo((): Mood => buddy().mood);
   const spriteColor = createMemo(() => MOOD_COLORS[mood()] ?? '#d29922');
 
-  // Animation: pick frame + eye from idle sequence
+  // Quip picked from pool using the rotation index (stable between data refreshes)
+  const quip = createMemo(() => {
+    const pool = buddy().pool;
+    if (pool.length === 0) return '';
+    return pool[quipIdx() % pool.length];
+  });
+
+  // Sprite animation
   const eye = createMemo(() => {
-    const seqIdx = tick() % IDLE_SEQ.length;
-    const hint = IDLE_SEQ[seqIdx];
-    if (hint === -1) return BLINK_EYE;
-    return MOOD_EYES[mood()] ?? EYE;
+    const hint = IDLE_SEQ[tick() % IDLE_SEQ.length];
+    return hint === -1 ? '-' : (MOOD_EYES[mood()] ?? '*');
   });
 
   const frameIdx = createMemo(() => {
-    const seqIdx = tick() % IDLE_SEQ.length;
-    const hint = IDLE_SEQ[seqIdx];
-    if (hint === -1) return 0; // blink uses rest pose
-    return hint % FRAMES.length;
+    const hint = IDLE_SEQ[tick() % IDLE_SEQ.length];
+    return hint === -1 ? 0 : (hint % FRAMES.length);
   });
 
   const sprite = createMemo(() =>
     FRAMES[frameIdx()].map(line => line.replaceAll('{E}', eye()))
   );
 
-  // Speech bubble: stable between data refreshes
+  // Bubble layout
   const bubbleW = createMemo(() => Math.max(12, (props.panelWidth ?? 40) - SPRITE_W - 5));
-  const bubble = createMemo(() => buildBubble(buddy().quip, bubbleW()));
+  const bubble = createMemo(() => buildBubble(quip(), bubbleW()));
 
-  // Compose: sprite on left, bubble on right, vertically centered
+  // Compose
   const totalH = createMemo(() => Math.max(sprite().length, bubble().length));
-
-  const spriteOffset = createMemo(() =>
-    Math.max(0, Math.floor((totalH() - sprite().length) / 2))
-  );
-  const bubbleOffset = createMemo(() =>
-    Math.max(0, Math.floor((totalH() - bubble().length) / 2))
-  );
+  const spriteOff = createMemo(() => Math.max(0, Math.floor((totalH() - sprite().length) / 2)));
+  const bubbleOff = createMemo(() => Math.max(0, Math.floor((totalH() - bubble().length) / 2)));
 
   return (
     <box
@@ -154,14 +146,14 @@ export function BuddyPanel(props: Props) {
       height={totalH() + 2}
     >
       {Array.from({ length: totalH() }, (_, i) => {
-        const si = i - spriteOffset();
-        const bi = i - bubbleOffset();
+        const si = i - spriteOff();
+        const bi = i - bubbleOff();
         const sLine = (si >= 0 && si < sprite().length) ? sprite()[si] : ' '.repeat(SPRITE_W);
         const bLine = (bi >= 0 && bi < bubble().length) ? bubble()[bi] : '';
         return (
           <box flexDirection="row" height={1}>
             <text fg={spriteColor()}>{sLine}</text>
-            <text fg="#484f58">{bLine}</text>
+            <text fg="#9198a1">{bLine}</text>
           </box>
         );
       })}
