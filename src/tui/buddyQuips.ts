@@ -1,98 +1,91 @@
 import type { AuditData } from "../core/types";
 
 export interface BuddyState {
-  face: string;
   quip: string;
   mood: "chill" | "wary" | "alarmed" | "crisis";
 }
 
-const FACES = {
-  chill:   " \u25E0\u203F\u25E0 ",
-  wary:    " \u25C9_\u25C9 ",
-  alarmed: " \u2299_\u2299 ",
-  crisis:  " \u00D7_\u00D7 ",
-};
-
-// ── Quip pools keyed by trigger condition ──────────────────────────
+// ── Drizzk's quip pools ────────────────────────────────────────────
+// LEGENDARY SHINY robot. DEBUGGING:100 PATIENCE:85 CHAOS:90 WISDOM:95 SNARK:80
+// A corroded chrome oracle who debugs flawlessly but refuses to explain fixes,
+// instead muttering about "the drizzle of '09" and how modern allocators lack grit.
 
 const LOW: string[] = [
-  "I say, the RAM is positively lounging about. How tediously civilized.",
-  "Memory this relaxed? Either genius or you haven't opened Chrome yet.",
-  "Smoother than Baldrick's last cunning plan. Which, admittedly, is a low bar.",
-  "All quiet on the memory front. Almost suspiciously quiet.",
-  "Your system is running with the effortless grace of a well-bribed butler.",
+  "Back in the drizzle of '09, we had 256MB and we were grateful.",
+  "Memory this calm? Suspicious. I've seen this before. Right before the OOM.",
+  "Nothing to report. I'll just sit here, corroding quietly.",
+  "Your allocators are... adequate. Don't let it go to your head.",
+  "Smooth sailing. Reminds me of a kernel I once knew. Before the incident.",
 ];
 
 const MEDIUM: string[] = [
-  "Memory's creeping up. I have a cunning plan involving that browser from 2024.",
-  "The RAM situation is what we call 'interesting'. By interesting, I mean concerning.",
-  "Not to alarm you, but we're entering 'maybe close a tab' territory.",
-  "Usage is rising like Baldrick's confidence before a spectacularly bad idea.",
-  "We're at the 'perhaps reconsider that third IDE' stage of the evening.",
+  "Hmm. Usage creeping up. Seen this pattern before. Won't say when. Or where.",
+  "Modern developers and their memory. No grit. No discipline. No free().",
+  "I could fix this, but explaining it would take longer than your uptime.",
+  "That's a lot of resident bytes for what I assume is a todo app.",
+  "Memory pressure building. Like the drizzle before a proper storm.",
 ];
 
 const HIGH: string[] = [
-  "I have a cunning plan, sir. What if we... freed some memory?",
-  "Your RAM is more packed than a Victorian workhouse. Downsizing, perhaps?",
-  "We're deep in the 'abandon hope, all ye who malloc here' zone.",
-  "If memory were a ship, we'd be rearranging deck chairs on the Titanic.",
-  "The situation is dire. Even Baldrick would notice, and he once mistook a turnip for his mother.",
+  "I've debugged this exact situation a thousand times. You won't like the fix.",
+  "Your RAM has the structural integrity of a wet husk. Kill something.",
+  "I know exactly what's wrong. No, I won't explain. Just trust the chrome.",
+  "This reminds me of the Great Leak of '14. Same smell. Same hubris.",
+  "You're running out of memory and patience. I can only help with one.",
 ];
 
 const CRITICAL: string[] = [
-  "DEFCON BALDRICK. I repeat, DEFCON BALDRICK.",
-  "This is more dire than Baldrick's personal hygiene. We must act.",
-  "My cunning plans have run out. This calls for actual competence.",
-  "We've gone beyond 'cunning plan' and into 'blind panic' territory.",
-  "The kernel is writing its memoirs. In swap. On a spinning disk. We're doomed.",
+  "CRITICAL. Even I'm worried, and I debug segfaults for fun.",
+  "The OOM killer is warming up. I've seen that look in its eyes before.",
+  "Memory at capacity. I'd explain the fix but you'd just malloc again.",
+  "Everything is on fire. This is fine. I've seen worse. Barely.",
+  "Your system has the memory headroom of a crushed tin can. Act now.",
 ];
 
 const SWAP: string[] = [
-  "Swapping to disk? The computational equivalent of sleeping in the gutter.",
-  "Swap active. Even Baldrick would call this a turnip of a situation.",
-  "Your SSD is doing RAM's job now. This is like asking the butler to do surgery.",
-  "Disk swap detected. We have descended below the floor of acceptable computing.",
+  "Swap. SWAP. Do you know what swap means? It means the disk is doing RAM's job.",
+  "Swapping to disk. In my day, that meant you'd already failed.",
+  "The SSD is crying. I can hear it. You probably can't. Lack of grit.",
+  "Disk swap active. The drizzle has become a flood. I warned you.",
 ];
 
 const AGENTS: string[] = [
-  "You've spawned more agents than the British Empire had colonies. Perhaps a cull?",
-  "{n} Claude agents. That's not multitasking, that's a parliamentary session.",
-  "Each agent thinks it's the protagonist. {n} protagonists, zero RAM to go around.",
-  "Running {n} agents simultaneously. Bold. Reckless. Baldrick-esque, one might say.",
-  "I count {n} agents. That's {n} opinions and one increasingly nervous kernel.",
+  "{n} agents. Each one convinced it's the main character. Classic.",
+  "That's {n} Claude instances. I've seen server farms with fewer tenants.",
+  "{n} agents hoarding memory like digital squirrels before winter.",
+  "Running {n} agents. Bold. Reckless. I've debugged the aftermath before.",
+  "{n} agents and counting. The kernel is taking notes. And names.",
 ];
 
 const DOCKER: string[] = [
-  "Your Docker containers eat RAM like Baldrick eats turnips.",
-  "Colima is hoarding {alloc} for containers using {actual}. Even the Treasury would blush.",
-  "The containers are comfortable. Your RAM, however, is not.",
-  "Docker: because why use memory efficiently when you can virtualize the problem?",
+  "Colima hoarding {alloc} for {actual} of containers. I've seen leaner VMs in a museum.",
+  "Your containers are living large. Your RAM is paying the rent.",
+  "Docker: because who needs real memory when you can abstract the problem away?",
+  "That VM allocation would make a mainframe blush. And not in a good way.",
 ];
 
 const COMPRESSOR: string[] = [
-  "The compressor is working overtime. Memory squeezed like a tax collector's heart.",
-  "macOS compressor engaged. Your RAM is being vacuum-packed like a budget airline seat.",
-  "Compression active. The kernel is playing Tetris with your memory, and losing.",
+  "Compressor engaged. Your memory is being squeezed like a data lemon.",
+  "macOS is compressing pages. Translation: your RAM is full of lies.",
+  "The compressor is working harder than I am. And I never stop working.",
 ];
 
 const IDLE: string[] = [
-  "I'm just here, watching the bytes go by. Existential, isn't it?",
-  "Another refresh cycle, another chance to judge your process management.",
-  "Monitoring memory so you don't have to. You're welcome.",
-  "Still here. Still sardonic. Still more useful than Baldrick.",
+  "Still watching. Still judging. The corrosion keeps me humble.",
+  "*mutters about modern allocators lacking grit*",
+  "I could tell you about the drizzle of '09. But you wouldn't understand.",
+  "Monitoring. Processing. Quietly disapproving. The usual.",
+  "Your bytes are safe. For now. I make no long-term promises.",
 ];
 
 // ── Quip selection engine ──────────────────────────────────────────
 
-let lastQuip = "";
 let quipCounter = 0;
 
 function pick(pool: string[], data?: AuditData): string {
-  // Rotate through the pool rather than random, so each refresh gets a new one
   quipCounter++;
   let q = pool[quipCounter % pool.length];
 
-  // Template substitution
   if (data) {
     q = q.replace(/\{n\}/g, String(data.totalInstances));
     q = q.replace(/\{alloc\}/g, data.docker.colimaAlloc);
@@ -106,7 +99,7 @@ function pick(pool: string[], data?: AuditData): string {
 }
 
 export function getBuddyState(data: AuditData | null): BuddyState {
-  if (!data) return { face: FACES.chill, quip: "Collecting intel...", mood: "chill" };
+  if (!data) return { quip: "Booting up. Calibrating cynicism...", mood: "chill" };
 
   const pct = data.system.totalMB > 0
     ? (data.system.usedMB / data.system.totalMB) * 100
@@ -121,31 +114,14 @@ export function getBuddyState(data: AuditData | null): BuddyState {
     data.docker.containers.reduce((s, c) => s + (parseFloat(c.mem) || 0), 0) < data.docker.vmActual * 0.3;
   const compressorBusy = data.system.compMB > data.system.totalMB * 0.15;
 
-  // Priority: swap > critical > high > agents > docker > compressor > medium > low > idle
-  if (hasSwap) {
-    return { face: FACES.crisis, quip: pick(SWAP, data), mood: "crisis" };
-  }
-  if (pct > 90) {
-    return { face: FACES.crisis, quip: pick(CRITICAL, data), mood: "crisis" };
-  }
-  if (pct > 75) {
-    return { face: FACES.alarmed, quip: pick(HIGH, data), mood: "alarmed" };
-  }
-  if (manyAgents) {
-    return { face: FACES.wary, quip: pick(AGENTS, data), mood: "wary" };
-  }
-  if (dockerHeavy) {
-    return { face: FACES.wary, quip: pick(DOCKER, data), mood: "wary" };
-  }
-  if (compressorBusy) {
-    return { face: FACES.wary, quip: pick(COMPRESSOR, data), mood: "wary" };
-  }
-  if (pct > 50) {
-    return { face: FACES.wary, quip: pick(MEDIUM, data), mood: "wary" };
-  }
-  if (pct > 20) {
-    return { face: FACES.chill, quip: pick(LOW, data), mood: "chill" };
-  }
+  if (hasSwap)        return { quip: pick(SWAP, data),       mood: "crisis" };
+  if (pct > 90)       return { quip: pick(CRITICAL, data),   mood: "crisis" };
+  if (pct > 75)       return { quip: pick(HIGH, data),       mood: "alarmed" };
+  if (manyAgents)     return { quip: pick(AGENTS, data),     mood: "wary" };
+  if (dockerHeavy)    return { quip: pick(DOCKER, data),     mood: "wary" };
+  if (compressorBusy) return { quip: pick(COMPRESSOR, data), mood: "wary" };
+  if (pct > 50)       return { quip: pick(MEDIUM, data),     mood: "wary" };
+  if (pct > 20)       return { quip: pick(LOW, data),        mood: "chill" };
 
-  return { face: FACES.chill, quip: pick(IDLE, data), mood: "chill" };
+  return { quip: pick(IDLE, data), mood: "chill" };
 }
