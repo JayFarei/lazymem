@@ -11,6 +11,8 @@ Terminal UI memory monitor for macOS dev environments. Built with [Bun](https://
 
 Tracks system memory, per-process RSS, Claude/Codex agent sessions, Node/dev tools, Docker containers, and swap pressure in a single dashboard.
 
+![lazymem screenshot](screenshot.png)
+
 ## Install
 
 ### Homebrew
