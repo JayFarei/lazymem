@@ -13,6 +13,7 @@ import { DevPanel } from "./components/DevPanel";
 import { StatusBar } from "./components/StatusBar";
 import { HelpOverlay } from "./components/HelpOverlay";
 import { FullscreenPane } from "./components/FullscreenPane";
+import { BuddyPanel } from "./components/BuddyPanel";
 import { usePaneState } from "./hooks/useViewMode";
 import { useKeybindings } from "./hooks/useKeybindings";
 import { serializeSnapshot } from "../core/snapshot";
@@ -220,6 +221,7 @@ export function App() {
                   /* Narrow: single column */
                   <box flexDirection="column" flexGrow={1}>
                     <SystemPanel data={data()} focused={focus() === "sys"}    panelWidth={panelContentW()} anomalies={anomalies()} selectedIndex={selectedIndex()} expandedIndex={paneExp("sys")}    flexGrow={focus() === "sys" ? 4 : 2} />
+                    <BuddyPanel data={data()} panelWidth={panelContentW()} />
                     <AgentPanel  data={data()} focused={focus() === "agents"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("agents")} flexGrow={focus() === "agents" ? 4 : 2} />
                     <DevPanel    data={data()} focused={focus() === "dev"}    panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("dev")}    flexGrow={focus() === "dev" ? 3 : 1} />
                     <DockerPanel docker={data()?.docker ?? null} focused={focus() === "docker"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("docker")} flexGrow={focus() === "docker" ? 3 : 1} />
@@ -231,7 +233,10 @@ export function App() {
                   fallback={
                     /* Medium (100-119): two columns */
                     <box flexDirection="row" flexGrow={1}>
-                      <SystemPanel data={data()} focused={focus() === "sys"} panelWidth={panelContentW()} anomalies={anomalies()} selectedIndex={selectedIndex()} expandedIndex={paneExp("sys")}    flexGrow={sysGrow()} />
+                      <box flexDirection="column" flexGrow={sysGrow()}>
+                        <SystemPanel data={data()} focused={focus() === "sys"} panelWidth={panelContentW()} anomalies={anomalies()} selectedIndex={selectedIndex()} expandedIndex={paneExp("sys")}    flexGrow={1} />
+                        <BuddyPanel data={data()} panelWidth={panelContentW()} />
+                      </box>
                       <box flexDirection="column" flexGrow={agentsGrow() + rightGrow()}>
                         <AgentPanel  data={data()} focused={focus() === "agents"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("agents")} flexGrow={agentsGrow()} />
                         <DevPanel    data={data()} focused={focus() === "dev"}    panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("dev")}    flexGrow={devGrow()} />
@@ -242,7 +247,10 @@ export function App() {
                 >
                   {/* Wide (>=120): three columns */}
                   <box flexDirection="row" flexGrow={1}>
-                    <SystemPanel data={data()} focused={focus() === "sys"} panelWidth={panelContentW()} anomalies={anomalies()} selectedIndex={selectedIndex()} expandedIndex={paneExp("sys")}    flexGrow={sysGrow()} />
+                    <box flexDirection="column" flexGrow={sysGrow()}>
+                      <SystemPanel data={data()} focused={focus() === "sys"} panelWidth={panelContentW()} anomalies={anomalies()} selectedIndex={selectedIndex()} expandedIndex={paneExp("sys")}    flexGrow={1} />
+                      <BuddyPanel data={data()} panelWidth={panelContentW()} />
+                    </box>
                     <AgentPanel  data={data()} focused={focus() === "agents"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("agents")} flexGrow={agentsGrow()} />
                     <box flexDirection="column" flexGrow={rightGrow()}>
                       <DevPanel    data={data()} focused={focus() === "dev"}    panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("dev")}    flexGrow={devGrow()} />
