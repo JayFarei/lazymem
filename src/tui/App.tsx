@@ -15,6 +15,7 @@ import { HelpOverlay } from "./components/HelpOverlay";
 import { FullscreenPane } from "./components/FullscreenPane";
 import { usePaneState } from "./hooks/useViewMode";
 import { useKeybindings } from "./hooks/useKeybindings";
+import { serializeSnapshot } from "../core/snapshot";
 
 function emptyData(): AuditData {
   return {
@@ -45,6 +46,26 @@ export function App() {
   const [loading, setLoading]   = createSignal(true);
   const [ready, setReady]       = createSignal(false);
   const [showHelp, setShowHelp] = createSignal(false);
+  const [copied, setCopied]     = createSignal(false);
+
+  function copySnapshot() {
+    const d = data();
+    if (!d) return;
+    const text = serializeSnapshot(d, focus());
+    const b64 = Buffer.from(text).toString("base64");
+    // Write OSC 52 to /dev/tty directly, bypassing the TUI renderer
+    const osc = `\x1b\x1b]52;c;${b64}\x07`;
+    const seq = process.env.TMUX
+      ? `\x1bPtmux;${osc}\x1b\\`
+      : `\x1b]52;c;${b64}\x07`;
+    try {
+      const fd = require("fs").openSync("/dev/tty", "w");
+      require("fs").writeSync(fd, seq);
+      require("fs").closeSync(fd);
+    } catch {}
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   const {
     focus, setFocus, cycleFocus,
@@ -171,6 +192,7 @@ export function App() {
     toggleFullscreen,
     exitFullscreen,
     fullscreenActive: () => fullscreen() !== null,
+    copySnapshot,
   });
 
   // Only pass expandedIndex to the focused pane; others get undefined
@@ -236,6 +258,7 @@ export function App() {
                 totalMem={data()?.totalClaudeMem ?? 0}
                 anomalies={anomalies().length}
                 focus={focus()}
+                copied={copied()}
               />
             </box>
           }

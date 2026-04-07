@@ -109,7 +109,6 @@ export function AgentPanel(props: Props) {
               <For each={sessions()}>
                 {(s, idx) => {
                   const selected = () => idx() === (props.selectedIndex ?? 0);
-                  const isInlineExpanded = () => idx() === (props.expandedIndex ?? -1);
                   const pct   = () => s.totalMem / maxMem();
                   const color = () => memColor(pct(), s.totalMem);
                   const sW    = sessionW();
@@ -128,34 +127,33 @@ export function AgentPanel(props: Props) {
                           <AnimatedBar pct={pct()} width={barWMag()} fg={color()} emptyFg="#21262d" />
                         </Show>
                       </box>
-                      <Show when={isInlineExpanded()}>
+                      {/* Always show detail rows in expanded/fullscreen view */}
+                      <box flexDirection="row" height={1}>
+                        <text fg="#4d5566">{"    project  "}</text>
+                        <text fg="#8b949e">{s.project.slice(0, Math.max(10, panelW() - 15))}</text>
+                      </box>
+                      <Show when={s.instances > 0}>
                         <box flexDirection="row" height={1}>
-                          <text fg="#4d5566">{"    project  "}</text>
-                          <text fg="#8b949e">{s.project.slice(0, Math.max(10, panelW() - 15))}</text>
-                        </box>
-                        <Show when={s.instances > 0}>
-                          <box flexDirection="row" height={1}>
-                            <text fg="#4d5566">{"    claude   "}</text>
-                            <text fg="#3fb950">{s.instances}x</text>
-                          </box>
-                        </Show>
-                        <Show when={s.codexInstances > 0}>
-                          <box flexDirection="row" height={1}>
-                            <text fg="#4d5566">{"    codex    "}</text>
-                            <text fg="#8957e5">{s.codexInstances}x</text>
-                          </box>
-                        </Show>
-                        <Show when={s.sidecars > 0}>
-                          <box flexDirection="row" height={1}>
-                            <text fg="#4d5566">{"    mcp      "}</text>
-                            <text fg="#4d5566">{s.sidecars}x</text>
-                          </box>
-                        </Show>
-                        <box flexDirection="row" height={1}>
-                          <text fg="#4d5566">{"    mem      "}</text>
-                          <text fg={color()}>{fmtMB(s.totalMem)}</text>
+                          <text fg="#4d5566">{"    claude   "}</text>
+                          <text fg="#3fb950">{s.instances}x</text>
                         </box>
                       </Show>
+                      <Show when={s.codexInstances > 0}>
+                        <box flexDirection="row" height={1}>
+                          <text fg="#4d5566">{"    codex    "}</text>
+                          <text fg="#8957e5">{s.codexInstances}x</text>
+                        </box>
+                      </Show>
+                      <Show when={s.sidecars > 0}>
+                        <box flexDirection="row" height={1}>
+                          <text fg="#4d5566">{"    mcp      "}</text>
+                          <text fg="#4d5566">{s.sidecars}x</text>
+                        </box>
+                      </Show>
+                      <box flexDirection="row" height={1}>
+                        <text fg="#4d5566">{"    mem      "}</text>
+                        <text fg={color()}>{fmtMB(s.totalMem)}</text>
+                      </box>
                     </box>
                   );
                 }}

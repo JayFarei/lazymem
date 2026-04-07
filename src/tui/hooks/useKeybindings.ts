@@ -14,6 +14,7 @@ export interface KeybindingHandlers {
   toggleFullscreen: () => void;
   exitFullscreen:   () => void;
   fullscreenActive: () => boolean;
+  copySnapshot:     () => void;
 }
 
 export function useKeybindings(h: KeybindingHandlers) {
@@ -58,6 +59,10 @@ export function useKeybindings(h: KeybindingHandlers) {
 
       case "g":
         h.toggleFullscreen();
+        break;
+
+      case "c":
+        h.copySnapshot();
         break;
 
       case "Escape":

@@ -54,17 +54,24 @@ export function SystemPanel(props: Props) {
     : props.panelWidth != null
       ? props.panelWidth
       : Math.max(20, Math.floor(dims().width / 3) - 4);
-  // Memory section columns (expanded: fixed bar so values align; minified: fill)
-  //   label(8) + gap(5) + bar + value(13)  → bar = panelW - 26, capped at 60
-  const memBarW  = () => props.expanded
-    ? Math.min(60, Math.max(8, panelW() - 26))
-    : Math.max(6, panelW() - 25);
+  // Dot-matrix: full-width on non-label rows, label row reserves space for "RAM " + value
+  const ramValStr  = () => fmtMB(usedMB()) + "/" + fmtMB(totalMB());
+  const ramValW    = () => ramValStr().length + 2; // 2 for "  " prefix
+  const dotFullW   = () => panelW();              // non-label rows: edge to edge
+  const dotLabelW  = () => Math.max(4, panelW() - 4 - ramValW()); // label row: "RAM " + bar + value
+  // Shared right-aligned value column width: fits the widest value (swap ratio)
+  const valW = () => {
+    const swapStr = swapValStr();
+    return Math.max(7, swapStr.length + 1);
+  };
+  // Memory breakdown bar: label(8) + bar + value(valW) = panelW
+  const memBarW  = () => Math.max(4, panelW() - 8 - valW());
   // Proc section: name column scales with panel width, bar fills remaining space
   const procNameW = () => props.expanded
     ? Math.min(24, Math.max(14, panelW() - 30))
     : Math.min(18, Math.max(12, 12 + Math.floor((panelW() - 30) / 2)));
-  // subtract 1 for scrollbar + 1 for name/bar gap
-  const procBarW  = () => Math.max(4, panelW() - procNameW() - 11);
+  // name(2+procNameW) + gap(1) + bar + value(valW)
+  const procBarW  = () => Math.max(4, panelW() - procNameW() - 3 - valW());
 
   const sys       = () => props.data?.system;
   const totalMB   = () => Math.max(sys()?.totalMB ?? 1, 1);
@@ -92,8 +99,8 @@ export function SystemPanel(props: Props) {
   const hasSwap     = () => swapTotMB2() > 0;
   const swapValStr  = () => `${fmtMB(swapUsedMB2())}/${fmtMB(swapTotMB2())}`;
 
-  // Right-aligned value column for memory rows in expanded mode (13 chars)
-  const memVal = (s: string) => props.expanded ? s.padStart(13) : "  " + s;
+  // Right-aligned value column for memory breakdown and procs
+  const memVal = (s: string) => s.padStart(valW());
 
   // Exclude PIDs already shown in agents/dev panels and docker VM
   const coveredPids = () => {
@@ -155,70 +162,60 @@ export function SystemPanel(props: Props) {
         }
       >
         {/* ── RAM — 7-row dot-matrix percentage display (5×7 font) ── */}
-        {/* Rows must be direct children of the panel box (not wrapped in a
-            nested flex-column) because @opentui collapses nested column containers
-            to 1-row height. Label + value on middle row (3). */}
+        {/* Non-label rows go edge-to-edge. Label row (3) wraps "RAM" and value. */}
         <box flexDirection="row" height={1} marginTop={1}>
-          <text fg="#21262d">{"▪".repeat(13)}</text>
-          <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={0} width={memBarW()} pct={usedPct()} />
+          <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={0} width={dotFullW()} pct={usedPct()} />
         </box>
         <box flexDirection="row" height={1}>
-          <text fg="#21262d">{"▪".repeat(13)}</text>
-          <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={1} width={memBarW()} pct={usedPct()} />
+          <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={1} width={dotFullW()} pct={usedPct()} />
         </box>
         <box flexDirection="row" height={1}>
-          <text fg="#21262d">{"▪".repeat(13)}</text>
-          <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={2} width={memBarW()} pct={usedPct()} />
+          <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={2} width={dotFullW()} pct={usedPct()} />
         </box>
         <box flexDirection="row" height={1}>
-          <text fg={titleColor()}>{"RAM".padEnd(8)}</text>
-          <text fg="#21262d">{"▪▪▪▪▪"}</text>
-          <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={3} width={memBarW()} pct={usedPct()} />
-          <text fg="#8b949e">{memVal(fmtMB(usedMB()) + "/" + fmtMB(totalMB()))}</text>
+          <text fg={titleColor()}>{"RAM "}</text>
+          <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={3} width={dotLabelW()} pct={usedPct()} leftMargin={4} refWidth={dotFullW()} />
+          <text fg="#8b949e">{"  " + ramValStr()}</text>
         </box>
         <box flexDirection="row" height={1}>
-          <text fg="#21262d">{"▪".repeat(13)}</text>
-          <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={4} width={memBarW()} pct={usedPct()} />
+          <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={4} width={dotFullW()} pct={usedPct()} />
         </box>
         <box flexDirection="row" height={1}>
-          <text fg="#21262d">{"▪".repeat(13)}</text>
-          <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={5} width={memBarW()} pct={usedPct()} />
+          <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={5} width={dotFullW()} pct={usedPct()} />
         </box>
         <box flexDirection="row" height={1}>
-          <text fg="#21262d">{"▪".repeat(13)}</text>
-          <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={6} width={memBarW()} pct={usedPct()} />
+          <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={6} width={dotFullW()} pct={usedPct()} />
         </box>
 
         {/* ── Memory breakdown (expanded) ────────────── */}
         <Show when={props.expanded}>
           <box flexDirection="row" height={1}>
-            <text fg="#4d5566">{"  app".padEnd(8)}</text><text fg="#4d5566">{"     "}</text>
+            <text fg="#4d5566">{"  app".padEnd(8)}</text>
             <AnimatedBar pct={appPct()} width={memBarW()} fg="#58a6ff" emptyFg="#21262d" />
             <text fg="#4d5566">{memVal(fmtMB(appMB()))}</text>
           </box>
           <box flexDirection="row" height={1}>
-            <text fg="#4d5566">{"  wired".padEnd(8)}</text><text fg="#4d5566">{"     "}</text>
+            <text fg="#4d5566">{"  wired".padEnd(8)}</text>
             <AnimatedBar pct={wiredPct()} width={memBarW()} fg="#4d5566" emptyFg="#21262d" />
             <text fg="#4d5566">{memVal(fmtMB(wiredMB()))}</text>
           </box>
           <box flexDirection="row" height={1}>
-            <text fg="#d29922">{"  comp".padEnd(8)}</text><text fg="#4d5566">{"     "}</text>
+            <text fg="#d29922">{"  comp".padEnd(8)}</text>
             <AnimatedBar pct={compPct()} width={memBarW()} fg="#d29922" emptyFg="#21262d" />
             <text fg="#d29922">{memVal(fmtMB(compMB()))}</text>
           </box>
           <box flexDirection="row" height={1}>
-            <text fg="#4d5566">{"  cached".padEnd(8)}</text><text fg="#4d5566">{"     "}</text>
+            <text fg="#4d5566">{"  cached".padEnd(8)}</text>
             <AnimatedBar pct={cachedPct()} width={memBarW()} fg="#30363d" emptyFg="#21262d" />
             <text fg="#4d5566">{memVal(fmtMB(cachedMB()))}</text>
           </box>
           <box flexDirection="row" height={1}>
-            <text fg="#4d5566">{"  free".padEnd(8)}</text><text fg="#4d5566">{"     "}</text>
+            <text fg="#4d5566">{"  free".padEnd(8)}</text>
             <AnimatedBar pct={freeMB() / totalMB()} width={memBarW()} fg="#2d333b" emptyFg="#21262d" />
             <text fg="#4d5566">{memVal(fmtMB(freeMB()))}</text>
           </box>
           <box flexDirection="row" height={hasSwap() ? 1 : 0}>
             <text fg={swapPct() > 0.5 ? "#d29922" : "#4d5566"}>{"  swap".padEnd(8)}</text>
-            <text fg="#4d5566">{"     "}</text>
             <AnimatedBar pct={swapPct()} width={memBarW()} fg={swapPct() > 0.5 ? "#d29922" : "#4d5566"} emptyFg="#21262d" />
             <text fg={swapPct() > 0.5 ? "#d29922" : "#4d5566"}>{memVal(swapValStr())}</text>
           </box>
@@ -237,7 +234,7 @@ export function SystemPanel(props: Props) {
         <box flexDirection="row" height={1} marginBottom={0}>
           <text fg="#4d5566">{"  " + "name".padEnd(procNameW())}</text>
           <text fg="#4d5566">{" " + "usage".padEnd(procBarW())}</text>
-          <text fg="#4d5566">{"mem".padStart(5)}</text>
+          <text fg="#4d5566">{"mem".padStart(valW())}</text>
         </box>
 
         <scrollbox
@@ -258,7 +255,7 @@ export function SystemPanel(props: Props) {
                     <text fg={selected() ? "#c9d1d9" : color}>{marker() + rawLabel.slice(0, nameW).padEnd(nameW)}</text>
                     <text fg="#30363d">{" "}</text>
                     <AnimatedBar pct={group.totalMB / maxGroupMem()} width={procBarW()} fg={selected() ? "#c9d1d9" : color} emptyFg="#21262d" />
-                    <text fg={selected() ? "#c9d1d9" : color}>{fmtMB(group.totalMB).padStart(5)}</text>
+                    <text fg={selected() ? "#c9d1d9" : color}>{memVal(fmtMB(group.totalMB))}</text>
                   </box>
                   <Show when={isInlineExpanded()}>
                     <For each={group.procs}>

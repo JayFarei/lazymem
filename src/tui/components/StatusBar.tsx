@@ -7,6 +7,7 @@ interface Props {
   totalMem: number;
   anomalies: number;
   focus: FocusPane;
+  copied?: boolean;
 }
 
 const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -62,12 +63,19 @@ export function StatusBar(props: Props) {
       <text fg={focusColor()}>{props.focus}</text>
       <text fg="#30363d">  │  </text>
 
+      {/* Copy feedback */}
+      <Show when={props.copied}>
+        <text fg="#3fb950">✓ copied</text>
+        <text fg="#30363d">  │  </text>
+      </Show>
+
       {/* Compact key hints */}
       <text fg="#4d5566">r</text><text fg="#8b949e"> fresh  </text>
       <text fg="#4d5566">Tab</text><text fg="#8b949e"> cycle  </text>
       <text fg="#4d5566">1-4</text><text fg="#8b949e"> focus  </text>
       <text fg="#4d5566">j/k</text><text fg="#8b949e"> nav  </text>
       <text fg="#4d5566">g</text><text fg="#8b949e"> full  </text>
+      <text fg="#4d5566">c</text><text fg="#8b949e"> copy  </text>
       <text fg="#4d5566">?</text><text fg="#8b949e"> help  </text>
       <text fg="#4d5566">q</text><text fg="#8b949e"> quit</text>
     </box>

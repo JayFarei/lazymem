@@ -11,17 +11,24 @@ export function digitColor(pct: number): string {
   return "#3fb950";
 }
 
-/** Compute the RLE runs for a single row of the dot-matrix grid. */
+/** Compute the RLE runs for a single row of the dot-matrix grid.
+ *  leftMargin: cols before this bar in the row (e.g. 4 for "RAM "). Used to
+ *  center digits relative to a wider reference width so they align with
+ *  full-width rows above/below. */
 export function dotMatrixRow(
   label: string,
   row: number,
   width: number,
   digitFg: string,
   gridFg: string,
+  leftMargin = 0,
+  refWidth?: number,
 ): DotMatrixRowRun[] {
   const gw = glyphWidth(label);
   const showDigits = gw + 2 <= width;
-  const offset = showDigits ? Math.floor((width - gw) / 2) : 0;
+  // Center digits relative to refWidth (full panel), then shift into local coords
+  const rw = refWidth ?? width;
+  const offset = showDigits ? Math.floor((rw - gw) / 2) - leftMargin : 0;
   const line = showDigits ? rasterizeLine(label, row) : [];
 
   const runs: DotMatrixRowRun[] = [];
@@ -52,9 +59,11 @@ export function DotMatrixRow(props: {
   width: number;
   pct: number;
   gridFg?: string;
+  leftMargin?: number;
+  refWidth?: number;
 }) {
   const runs = createMemo(() =>
-    dotMatrixRow(props.label, props.row, props.width, digitColor(props.pct), props.gridFg ?? "#21262d")
+    dotMatrixRow(props.label, props.row, props.width, digitColor(props.pct), props.gridFg ?? "#21262d", props.leftMargin ?? 0, props.refWidth)
   );
 
   return (

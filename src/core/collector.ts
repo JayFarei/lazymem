@@ -165,15 +165,15 @@ export async function collectDocker(): Promise<DockerInfo> {
   return { containers, colimaAlloc, vmActual };
 }
 
-function isSidecar(args: string): boolean {
+export function isSidecar(args: string): boolean {
   return args.includes("qmd mcp") || (args.includes("codex") && (args.includes("mcp-server") || args.includes("codex exec")));
 }
 
-function isClaude(cmd: string): boolean {
+export function isClaude(cmd: string): boolean {
   return cmd === "claude" || cmd.includes("claude");
 }
 
-function isCodexAgent(cmd: string, args: string): boolean {
+export function isCodexAgent(cmd: string, args: string): boolean {
   return !isClaude(cmd) && !isSidecar(args) && args.toLowerCase().includes("codex");
 }
 
