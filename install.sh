@@ -48,7 +48,7 @@ curl -fsSL "$TARBALL_URL" | tar -xz -C "$TMP_DIR"
 rm -rf "$INSTALL_DIR"
 mv "$TMP_DIR/lazymem-$LATEST" "$INSTALL_DIR"
 cd "$INSTALL_DIR"
-bun install --production
+bun install --production --no-frozen-lockfile
 
 # Symlink
 if [ -w "$BIN_DIR" ]; then
