@@ -99,7 +99,7 @@ export function DockerPanel(props: Props) {
         {/* VM usage bar */}
         <Show when={props.docker!.colimaAlloc !== "N/A"}>
           <box flexDirection="row" height={1} marginTop={1}>
-            <text fg="#4d5566">{"VM".padEnd(4)}</text>
+            <text fg="#4d5566">{"  VM".padEnd(6)}</text>
             <text fg="#c9d1d9">{props.docker!.vmActual}M</text>
             <text fg="#4d5566"> / </text>
             <text fg="#8b949e">{props.docker!.colimaAlloc}  </text>
@@ -124,14 +124,14 @@ export function DockerPanel(props: Props) {
         >
           {/* Header */}
           <box flexDirection="row" height={1} marginTop={1}>
-            <text fg="#4d5566">{"container".padEnd(containerW())}</text>
+            <text fg="#4d5566">{"  container".padEnd(containerW())}</text>
             <Show when={barW() >= 4}>
               <text fg="#4d5566">{" " + "usage".padEnd(barW())}</text>
             </Show>
             <text fg="#4d5566">{"mem".padStart(6)}</text>
           </box>
 
-          <scrollbox flexGrow={1} focused={props.focused} style={SCROLL_STYLE}>
+          <scrollbox ref={(el: any) => { if (el?.verticalScrollBar) el.verticalScrollBar.visible = false; }} flexGrow={1} focused={props.focused} style={SCROLL_STYLE}>
             <For each={containers()}>
               {(c, idx) => {
                 const selected = () => props.focused && idx() === (props.selectedIndex ?? 0);
@@ -142,8 +142,8 @@ export function DockerPanel(props: Props) {
                 const imgName = c.image ? c.image.split(":")[0].split("/").pop() ?? "" : "";
                 const showImg = c.image && imgName !== c.name && imgName !== c.name.split("-")[0];
                 const label   = showImg
-                  ? `${c.name.slice(0, cW - 12)} [${imgName.slice(0, 8)}${imgTag && imgTag !== "latest" ? `:${imgTag.slice(0, 4)}` : ""}]`.slice(0, cW - 1).padEnd(cW)
-                  : c.name.slice(0, cW - 1).padEnd(cW);
+                  ? ("  " + `${c.name.slice(0, cW - 14)} [${imgName.slice(0, 8)}${imgTag && imgTag !== "latest" ? `:${imgTag.slice(0, 4)}` : ""}]`).slice(0, cW - 1).padEnd(cW)
+                  : ("  " + c.name.slice(0, cW - 3)).padEnd(cW);
                 const isInlineExpanded = () => idx() === (props.expandedIndex ?? -1);
                 const displayLabel = () => selected()
                   ? ("▸ " + c.name.slice(0, cW - 3)).padEnd(cW)

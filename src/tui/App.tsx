@@ -1,5 +1,6 @@
 import { createSignal, createMemo, onMount, onCleanup, Show } from "solid-js";
 import { useRenderer, useTerminalDimensions } from "@opentui/solid";
+import { LoadingSplash } from "./components/LoadingSplash";
 import {
   collectSystem, collectTmux, collectTopProcs, collectProcesses, collectDocker,
   buildSessions,
@@ -42,6 +43,7 @@ export function App() {
 
   const [data, setData]         = createSignal<AuditData | null>(null);
   const [loading, setLoading]   = createSignal(true);
+  const [ready, setReady]       = createSignal(false);
   const [showHelp, setShowHelp] = createSignal(false);
 
   const {
@@ -74,7 +76,16 @@ export function App() {
     const d = data();
     if (!d) return 0;
     switch (focus()) {
-      case "sys":    return d.topProcs.length;
+      case "sys": {
+        // Count unique process groups (matching SystemPanel grouping)
+        const covered = new Set(d.processes.map(p => p.pid));
+        const names = new Set(
+          d.topProcs
+            .filter(p => p.cmd.trim().length > 0 && !covered.has(p.pid) && !p.args.includes("com.apple.Virtu") && !p.args.includes(".agent-browser/"))
+            .map(p => p.cmd)
+        );
+        return names.size;
+      }
       case "agents": return d.sessions.length;
       case "dev": {
         const isSC = (a: string) => a.includes("qmd mcp") || (a.includes("codex") && a.includes("mcp-server"));
@@ -140,6 +151,7 @@ export function App() {
     }
 
     setData(d => d ? { ...d, processes, docker, sessions, anomalies, totalInstances, totalClaudeMem } : null);
+    if (!ready()) setReady(true);
   }
 
   let timer: ReturnType<typeof setInterval>;
@@ -174,6 +186,7 @@ export function App() {
 
       {/* -- Main content (dashboard OR fullscreen, never both) ------ */}
       <Show when={!showHelp()}>
+        <Show when={ready()} fallback={<LoadingSplash />}>
         <Show
           when={fullscreen() !== null}
           fallback={
@@ -235,6 +248,7 @@ export function App() {
             selectedIndex={selectedIndex()}
             expandedIndex={expandedIndex() ?? undefined}
           />
+        </Show>
         </Show>
       </Show>
     </box>

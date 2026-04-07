@@ -56,24 +56,37 @@ export async function collectSystem(): Promise<SystemInfo> {
   return { totalMB, appMB, wiredMB, compMB, cachedMB, freeMB, usedMB, swap };
 }
 
+function extractProcName(args: string): string {
+  // macOS .app bundle: /Applications/Foo Bar.app/... → "Foo Bar"
+  const appMatch = args.match(/\/([^/]+)\.app\//);
+  if (appMatch) return appMatch[1];
+  // Binary with a path: take the last segment of the executable
+  const firstWord = args.split(/\s/)[0];
+  if (firstWord.includes("/")) {
+    const segs = firstWord.split("/").filter(Boolean);
+    return segs[segs.length - 1] || firstWord;
+  }
+  return firstWord;
+}
+
 export async function collectTopProcs(): Promise<TopProc[]> {
-  const out = await run(["ps", "-eo", "pid,comm,rss"]);
+  const out = await run(["ps", "-eo", "pid,rss,args"]);
   return out
     .split("\n")
     .filter((l) => l.trim())
     .map((l) => {
-      const parts = l.trim().split(/\s+/);
-      if (parts.length < 3 || !/^\d+$/.test(parts[0])) return null;
-      const pid = parts[0];
-      const cmd = parts[1];
-      const rssKB = parseInt(parts[parts.length - 1]) || 0;
+      const m = l.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/);
+      if (!m) return null;
+      const [, pid, rssStr, args] = m;
+      const cmd = extractProcName(args);
+      const rssKB = parseInt(rssStr) || 0;
       const memMB = Math.round(rssKB / 1024);
       const mem = memMB >= 1024 ? `${(memMB / 1024).toFixed(1)}G` : `${memMB}M`;
-      return { pid, cmd, mem, memMB };
+      return { pid, cmd, mem, memMB, args };
     })
     .filter(Boolean)
     .sort((a, b) => b!.memMB - a!.memMB)
-    .slice(0, 30) as TopProc[];
+    .slice(0, 80) as TopProc[];
 }
 
 export async function collectTmux(): Promise<TmuxPane[]> {
@@ -104,7 +117,7 @@ export async function collectProcesses(): Promise<ProcessInfo[]> {
     const m = trimmed.match(/^(\d+)\s+(\S+)\s+(\d+)\s+(\S+)\s*(.*)$/);
     if (!m) continue;
     const [, pid, tty, rssStr, cmd, args] = m;
-    if (!/claude|node/.test(cmd) && !/claude|node/.test(args)) continue;
+    if (!/claude|node|next-server|bun|npm|python|nvim/.test(cmd) && !/claude|node|next|vite|tsx|postcss|pnpm|nvim/.test(args)) continue;
     const mem = Math.round(parseInt(rssStr) / 1024) || 0;
     results.push({ pid, tty, mem, cmd, args: args.slice(0, 120) });
   }

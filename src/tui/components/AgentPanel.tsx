@@ -105,7 +105,7 @@ export function AgentPanel(props: Props) {
               </Show>
             </box>
 
-            <scrollbox flexGrow={1} focused={props.focused} style={SCROLL_STYLE}>
+            <scrollbox ref={(el: any) => { if (el?.verticalScrollBar) el.verticalScrollBar.visible = false; }} flexGrow={1} focused={props.focused} style={SCROLL_STYLE}>
               <For each={sessions()}>
                 {(s, idx) => {
                   const selected = () => idx() === (props.selectedIndex ?? 0);
@@ -173,7 +173,7 @@ export function AgentPanel(props: Props) {
               <text fg="#4d5566">{"mem".padStart(6)}</text>
             </box>
 
-            <scrollbox flexGrow={1} focused={props.focused} style={SCROLL_STYLE}>
+            <scrollbox ref={(el: any) => { if (el?.verticalScrollBar) el.verticalScrollBar.visible = false; }} flexGrow={1} focused={props.focused} style={SCROLL_STYLE}>
               <For each={sessions()}>
                 {(s, idx) => {
                   const selected = () => props.focused && idx() === (props.selectedIndex ?? 0);

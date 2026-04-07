@@ -15,6 +15,7 @@ export interface TopProc {
   cmd: string;
   mem: string;
   memMB: number;
+  args: string;
 }
 
 export interface TmuxPane {

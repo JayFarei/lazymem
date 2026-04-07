@@ -24,7 +24,7 @@ const KNOWN_DEV_TYPES = new Set([
   "claude", "codex-mcp", "codex",
   "next", "vite", "tsx", "postcss", "pnpm",
   "tailwind-lsp", "ts-lsp",
-  "python", "surf-cli", "qmd", "telegram",
+  "python", "surf-cli", "qmd", "telegram", "nvim",
 ]);
 
 function classify(cmd: string, args: string): string {
@@ -43,6 +43,7 @@ function classify(cmd: string, args: string): string {
   if (args.includes("surf-cli"))             return "surf-cli";
   if (args.includes("qmd") && args.includes("--http")) return "qmd";
   if (args.includes("telegram"))             return "telegram";
+  if (cmd.includes("nvim") || args.includes("nvim")) return "nvim";
   return cmd.split("/").pop() ?? cmd;
 }
 
@@ -227,7 +228,7 @@ export function DevPanel(props: Props) {
           </Show>
           <Show when={!props.expanded}>
             <box flexDirection="row" marginTop={1} height={1}>
-              <text fg="#4d5566">{"service".padEnd(miniLabelW())}</text>
+              <text fg="#4d5566">{"  service".padEnd(miniLabelW())}</text>
               <Show when={barWMini() >= 4}>
                 <text fg="#4d5566">{" " + "usage".padEnd(barWMini())}</text>
               </Show>
@@ -235,7 +236,7 @@ export function DevPanel(props: Props) {
             </box>
           </Show>
 
-          <scrollbox flexGrow={1} focused={props.focused} style={SCROLL_STYLE}>
+          <scrollbox ref={(el: any) => { if (el?.verticalScrollBar) el.verticalScrollBar.visible = false; }} flexGrow={1} focused={props.focused} style={SCROLL_STYLE}>
             <For each={indexedDevEntries()}>
               {({ entry, groupIndex }) => {
                 if (entry.kind === "group") {
@@ -259,7 +260,7 @@ export function DevPanel(props: Props) {
                   const isInlineExpanded = () => groupIndex === (props.expandedIndex ?? -1);
                   const lbl = () => selected()
                     ? ("▸ " + rawLbl.slice(0, mLW - 2)).padEnd(mLW)
-                    : rawLbl.slice(0, mLW).padEnd(mLW);
+                    : ("  " + rawLbl.slice(0, mLW - 2)).padEnd(mLW);
                   const sessions = () => devGroups()[groupIndex]?.sessions ?? [];
                   const maxSessionMem = () => Math.max(...sessions().map(s => s.mem), 1);
                   return (
