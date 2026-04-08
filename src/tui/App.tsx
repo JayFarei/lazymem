@@ -17,6 +17,7 @@ import { BuddyPanel } from "./components/BuddyPanel";
 import { usePaneState } from "./hooks/useViewMode";
 import { useKeybindings } from "./hooks/useKeybindings";
 import { serializeSnapshot } from "../core/snapshot";
+import { benchmark } from "../bench/runtime";
 
 function emptyData(): AuditData {
   return {
@@ -37,11 +38,42 @@ function emptyDocker(): DockerInfo {
   return { containers: [], colimaAlloc: "N/A", vmActual: 0 };
 }
 
+function buildWave2State(processes: AuditData["processes"], tmux: AuditData["tmux"], docker: DockerInfo) {
+  const { sessions, anomalies, totalInstances, totalClaudeMem } = buildSessions(processes, tmux);
+
+  const containerMem = docker.containers.reduce((sum, container) => sum + (parseFloat(container.mem) || 0), 0);
+  if (docker.vmActual > 500 && containerMem < docker.vmActual * 0.2) {
+    anomalies.push({
+      text: `Colima VM ${docker.colimaAlloc} for ${Math.round(containerMem)}MiB containers`,
+      severity: "warning",
+    });
+  }
+
+  return { sessions, anomalies, totalInstances, totalClaudeMem };
+}
+
 export function App() {
   const renderer = useRenderer();
   const dims = useTerminalDimensions();
   const width  = () => dims().width;
   const height = () => dims().height;
+  const benchmarkMode = benchmark.enabled
+    ? (process.env.LAZYMEM_BENCHMARK_MODE ?? "default")
+    : "default";
+  const benchmarkSystemMode =
+    benchmarkMode === "system-only" ||
+    benchmarkMode === "system-no-procs" ||
+    benchmarkMode === "system-procs-only" ||
+    benchmarkMode === "system-text-summary";
+  const benchmarkSystemNoProcs =
+    benchmarkMode === "system-no-procs" ||
+    benchmarkMode === "system-text-summary";
+  const benchmarkSystemPanelMode = benchmarkMode === "system-procs-only"
+    ? "procs-only"
+    : benchmarkSystemNoProcs
+      ? "no-procs"
+      : "full";
+  const benchmarkSystemSummaryMode = benchmarkMode === "system-text-summary" ? "text" : "full";
 
   const [data, setData]         = createSignal<AuditData | null>(null);
   const [loading, setLoading]   = createSignal(true);
@@ -134,6 +166,7 @@ export function App() {
 
   // Docker runs on cycle 1, 4, 7... (every 30s at 10s interval)
   let refreshCount = 0;
+  let benchmarkExitTimer: ReturnType<typeof setTimeout> | undefined;
 
   async function refresh() {
     setLoading(true);
@@ -144,41 +177,56 @@ export function App() {
       collectTmux(),
       collectTopProcs(),
     ]);
+    const storedTopProcs = benchmarkSystemNoProcs ? [] : topProcs;
     // On first load data is null — seed it with real values so panels never
     // flash the 0/0 skeleton. On subsequent refreshes, merge into existing data.
     setData(d => d
-      ? { ...d, system, tmux, topProcs }
-      : { ...emptyData(), system, tmux, topProcs }
+      ? { ...d, system, tmux, topProcs: storedTopProcs }
+      : { ...emptyData(), system, tmux, topProcs: storedTopProcs }
     );
 
     setLoading(false); // core data is ready; Wave 2 updates agents/docker silently
+    benchmark.markCoreReady();
 
-    // Wave 2 — slower: processes + conditionally docker
+    // Wave 2 — slower: processes now, docker asynchronously after first render
     refreshCount++;
     const runDocker = refreshCount === 1 || refreshCount % 3 === 1;
-    const [processes, docker] = await Promise.all([
-      collectProcesses(),
-      runDocker ? collectDocker() : Promise.resolve(data()?.docker ?? emptyDocker()),
-    ]);
+    const processes = await collectProcesses();
+    const storedProcesses = benchmarkSystemNoProcs ? [] : processes;
+    const currentDocker = data()?.docker ?? emptyDocker();
+    const wave2State = buildWave2State(storedProcesses, tmux, currentDocker);
 
-    const { sessions, anomalies, totalInstances, totalClaudeMem } = buildSessions(processes, tmux);
-
-    // Docker anomaly check
-    const containerMem = docker.containers.reduce((s, c) => s + (parseFloat(c.mem) || 0), 0);
-    if (docker.vmActual > 500 && containerMem < docker.vmActual * 0.2) {
-      anomalies.push({
-        text: `Colima VM ${docker.colimaAlloc} for ${Math.round(containerMem)}MiB containers`,
-        severity: "warning",
-      });
+    setData(d => d ? { ...d, processes: storedProcesses, docker: currentDocker, ...wave2State } : null);
+    if (!ready()) {
+      setReady(true);
+      if (benchmark.markFullReady() && !benchmarkExitTimer) {
+        benchmarkExitTimer = setTimeout(async () => {
+          benchmark.markIdle();
+          await benchmark.flush();
+          renderer.destroy();
+          process.exit(0);
+        }, benchmark.idleWaitMs);
+      }
     }
 
-    setData(d => d ? { ...d, processes, docker, sessions, anomalies, totalInstances, totalClaudeMem } : null);
-    if (!ready()) setReady(true);
+    if (runDocker) {
+      void collectDocker().then((docker) => {
+        setData(d => d ? { ...d, docker, ...buildWave2State(d.processes, d.tmux, docker) } : null);
+      });
+    }
   }
 
   let timer: ReturnType<typeof setInterval>;
-  onMount(async () => { await refresh(); timer = setInterval(refresh, 10_000); });
-  onCleanup(() => clearInterval(timer));
+  onMount(async () => {
+    await refresh();
+    if (!benchmark.enabled) {
+      timer = setInterval(refresh, 10_000);
+    }
+  });
+  onCleanup(() => {
+    if (timer) clearInterval(timer);
+    if (benchmarkExitTimer) clearTimeout(benchmarkExitTimer);
+  });
 
   useKeybindings({
     enabled:          () => !showHelp(),
@@ -210,76 +258,103 @@ export function App() {
       {/* -- Main content (dashboard OR fullscreen, never both) ------ */}
       <Show when={!showHelp()}>
         <Show when={ready()} fallback={<LoadingSplash />}>
-        <Show
-          when={fullscreen() !== null}
-          fallback={
-            /* -- Dashboard ----------------------------------------- */
-            <box flexDirection="column" flexGrow={1}>
+          <Show
+            when={benchmarkSystemMode}
+            fallback={
               <Show
-                when={!narrow()}
+                when={fullscreen() !== null}
                 fallback={
-                  /* Narrow: single column */
+                  /* -- Dashboard ----------------------------------------- */
                   <box flexDirection="column" flexGrow={1}>
-                    <SystemPanel data={data()} focused={focus() === "sys"}    panelWidth={panelContentW()} anomalies={anomalies()} selectedIndex={selectedIndex()} expandedIndex={paneExp("sys")}    flexGrow={focus() === "sys" ? 4 : 2} />
-                    <BuddyPanel data={data()} panelWidth={panelContentW()} />
-                    <AgentPanel  data={data()} focused={focus() === "agents"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("agents")} flexGrow={focus() === "agents" ? 4 : 2} />
-                    <DevPanel    data={data()} focused={focus() === "dev"}    panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("dev")}    flexGrow={focus() === "dev" ? 3 : 1} />
-                    <DockerPanel docker={data()?.docker ?? null} focused={focus() === "docker"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("docker")} flexGrow={focus() === "docker" ? 3 : 1} />
+                    <Show
+                      when={!narrow()}
+                      fallback={
+                        /* Narrow: single column */
+                        <box flexDirection="column" flexGrow={1}>
+                          <SystemPanel data={data()} focused={focus() === "sys"} panelWidth={panelContentW()} anomalies={anomalies()} selectedIndex={selectedIndex()} expandedIndex={paneExp("sys")} flexGrow={focus() === "sys" ? 4 : 2} />
+                          <BuddyPanel data={data()} panelWidth={panelContentW()} />
+                          <AgentPanel data={data()} focused={focus() === "agents"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("agents")} flexGrow={focus() === "agents" ? 4 : 2} />
+                          <DevPanel data={data()} focused={focus() === "dev"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("dev")} flexGrow={focus() === "dev" ? 3 : 1} />
+                          <DockerPanel docker={data()?.docker ?? null} focused={focus() === "docker"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("docker")} flexGrow={focus() === "docker" ? 3 : 1} />
+                        </box>
+                      }
+                    >
+                      <Show
+                        when={wide()}
+                        fallback={
+                          /* Medium (100-119): two columns */
+                          <box flexDirection="row" flexGrow={1}>
+                            <box flexDirection="column" flexGrow={sysGrow()}>
+                              <SystemPanel data={data()} focused={focus() === "sys"} panelWidth={panelContentW()} anomalies={anomalies()} selectedIndex={selectedIndex()} expandedIndex={paneExp("sys")} flexGrow={1} />
+                              <BuddyPanel data={data()} panelWidth={panelContentW()} />
+                            </box>
+                            <box flexDirection="column" flexGrow={agentsGrow() + rightGrow()}>
+                              <AgentPanel data={data()} focused={focus() === "agents"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("agents")} flexGrow={agentsGrow()} />
+                              <DevPanel data={data()} focused={focus() === "dev"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("dev")} flexGrow={devGrow()} />
+                              <DockerPanel docker={data()?.docker ?? null} focused={focus() === "docker"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("docker")} flexGrow={dockerGrow()} />
+                            </box>
+                          </box>
+                        }
+                      >
+                        {/* Wide (>=120): three columns */}
+                        <box flexDirection="row" flexGrow={1}>
+                          <box flexDirection="column" flexGrow={sysGrow()}>
+                            <SystemPanel data={data()} focused={focus() === "sys"} panelWidth={panelContentW()} anomalies={anomalies()} selectedIndex={selectedIndex()} expandedIndex={paneExp("sys")} flexGrow={1} />
+                            <BuddyPanel data={data()} panelWidth={panelContentW()} />
+                          </box>
+                          <AgentPanel data={data()} focused={focus() === "agents"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("agents")} flexGrow={agentsGrow()} />
+                          <box flexDirection="column" flexGrow={rightGrow()}>
+                            <DevPanel data={data()} focused={focus() === "dev"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("dev")} flexGrow={devGrow()} />
+                            <DockerPanel docker={data()?.docker ?? null} focused={focus() === "docker"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("docker")} flexGrow={dockerGrow()} />
+                          </box>
+                        </box>
+                      </Show>
+                    </Show>
+
+                    <StatusBar
+                      loading={loading()}
+                      instances={data()?.totalInstances ?? 0}
+                      totalMem={data()?.totalClaudeMem ?? 0}
+                      anomalies={anomalies().length}
+                      focus={focus()}
+                      copied={copied()}
+                    />
                   </box>
                 }
               >
-                <Show
-                  when={wide()}
-                  fallback={
-                    /* Medium (100-119): two columns */
-                    <box flexDirection="row" flexGrow={1}>
-                      <box flexDirection="column" flexGrow={sysGrow()}>
-                        <SystemPanel data={data()} focused={focus() === "sys"} panelWidth={panelContentW()} anomalies={anomalies()} selectedIndex={selectedIndex()} expandedIndex={paneExp("sys")}    flexGrow={1} />
-                        <BuddyPanel data={data()} panelWidth={panelContentW()} />
-                      </box>
-                      <box flexDirection="column" flexGrow={agentsGrow() + rightGrow()}>
-                        <AgentPanel  data={data()} focused={focus() === "agents"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("agents")} flexGrow={agentsGrow()} />
-                        <DevPanel    data={data()} focused={focus() === "dev"}    panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("dev")}    flexGrow={devGrow()} />
-                        <DockerPanel docker={data()?.docker ?? null} focused={focus() === "docker"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("docker")} flexGrow={dockerGrow()} />
-                      </box>
-                    </box>
-                  }
-                >
-                  {/* Wide (>=120): three columns */}
-                  <box flexDirection="row" flexGrow={1}>
-                    <box flexDirection="column" flexGrow={sysGrow()}>
-                      <SystemPanel data={data()} focused={focus() === "sys"} panelWidth={panelContentW()} anomalies={anomalies()} selectedIndex={selectedIndex()} expandedIndex={paneExp("sys")}    flexGrow={1} />
-                      <BuddyPanel data={data()} panelWidth={panelContentW()} />
-                    </box>
-                    <AgentPanel  data={data()} focused={focus() === "agents"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("agents")} flexGrow={agentsGrow()} />
-                    <box flexDirection="column" flexGrow={rightGrow()}>
-                      <DevPanel    data={data()} focused={focus() === "dev"}    panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("dev")}    flexGrow={devGrow()} />
-                      <DockerPanel docker={data()?.docker ?? null} focused={focus() === "docker"} panelWidth={panelContentW()} selectedIndex={selectedIndex()} expandedIndex={paneExp("docker")} flexGrow={dockerGrow()} />
-                    </box>
-                  </box>
-                </Show>
+                {/* -- Fullscreen ----------------------------------------- */}
+                <FullscreenPane
+                  pane={fullscreen()!}
+                  data={data()}
+                  anomalies={anomalies()}
+                  selectedIndex={selectedIndex()}
+                  expandedIndex={expandedIndex() ?? undefined}
+                />
               </Show>
-
+            }
+          >
+            <box flexDirection="column" flexGrow={1}>
+              <SystemPanel
+                data={data()}
+                focused={true}
+                sectionMode={benchmarkSystemPanelMode}
+                summaryMode={benchmarkSystemSummaryMode}
+                panelWidth={Math.max(20, width() - 4)}
+                anomalies={anomalies()}
+                selectedIndex={selectedIndex()}
+                expandedIndex={paneExp("sys")}
+                flexGrow={1}
+              />
               <StatusBar
                 loading={loading()}
                 instances={data()?.totalInstances ?? 0}
                 totalMem={data()?.totalClaudeMem ?? 0}
                 anomalies={anomalies().length}
-                focus={focus()}
+                focus="sys"
                 copied={copied()}
               />
             </box>
-          }
-        >
-          {/* -- Fullscreen ----------------------------------------- */}
-          <FullscreenPane
-            pane={fullscreen()!}
-            data={data()}
-            anomalies={anomalies()}
-            selectedIndex={selectedIndex()}
-            expandedIndex={expandedIndex() ?? undefined}
-          />
-        </Show>
+          </Show>
         </Show>
       </Show>
     </box>

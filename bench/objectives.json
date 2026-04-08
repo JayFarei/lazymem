@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "defaults": {
+    "warmupRuns": 1,
+    "measuredRuns": 5,
+    "idleWaitMs": 2500
+  },
+  "budgets": {
+    "cliToCoreReadyMs": 900,
+    "cliToFullReadyMs": 1600,
+    "rssAtFullReadyMB": 75,
+    "rssAfterIdleMB": 70,
+    "peakRssMB": 85
+  },
+  "stretch": {
+    "cliToFullReadyMs": 1200,
+    "rssAfterIdleMB": 60
+  }
+}

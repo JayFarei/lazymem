@@ -2,7 +2,7 @@ import { For, Show } from "solid-js";
 import { useTerminalDimensions } from "@opentui/solid";
 import type { AuditData, Anomaly, TopProc } from "../../core/index";
 import { AnimatedBar } from "./AnimatedBar";
-import { DotMatrixRow } from "./DotMatrixBar";
+import { digitColor, DotMatrixRow } from "./DotMatrixBar";
 
 interface ProcGroup {
   name: string;
@@ -14,6 +14,9 @@ interface ProcGroup {
 interface Props {
   data: AuditData | null;
   focused: boolean;
+  sectionMode?: "full" | "no-procs" | "procs-only";
+  summaryMode?: "full" | "text";
+  animateProcessBars?: boolean;
   expanded?: boolean;
   panelWidth?: number;
   flexGrow?: number;
@@ -141,6 +144,10 @@ export function SystemPanel(props: Props) {
     : " [1] sys ";
 
   const alerts = () => props.anomalies ?? [];
+  const showSummary = () => props.sectionMode !== "procs-only";
+  const showProcesses = () => props.sectionMode !== "no-procs";
+  const showAlerts = () => props.sectionMode === "full" || props.sectionMode === "no-procs";
+  const textSummary = () => props.summaryMode === "text";
 
   return (
     <box
@@ -161,125 +168,144 @@ export function SystemPanel(props: Props) {
           </box>
         }
       >
-        {/* ── RAM — 7-row dot-matrix percentage display (5×7 font) ── */}
-        {/* Non-label rows go edge-to-edge. Label row (3) wraps "RAM" and value. */}
-        <box flexDirection="row" height={1} marginTop={1}>
-          <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={0} width={dotFullW()} pct={usedPct()} />
-        </box>
-        <box flexDirection="row" height={1}>
-          <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={1} width={dotFullW()} pct={usedPct()} />
-        </box>
-        <box flexDirection="row" height={1}>
-          <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={2} width={dotFullW()} pct={usedPct()} />
-        </box>
-        <box flexDirection="row" height={1}>
-          <text fg={titleColor()}>{"RAM "}</text>
-          <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={3} width={dotLabelW()} pct={usedPct()} leftMargin={4} refWidth={dotFullW()} />
-          <text fg="#8b949e">{"  " + ramValStr()}</text>
-        </box>
-        <box flexDirection="row" height={1}>
-          <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={4} width={dotFullW()} pct={usedPct()} />
-        </box>
-        <box flexDirection="row" height={1}>
-          <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={5} width={dotFullW()} pct={usedPct()} />
-        </box>
-        <box flexDirection="row" height={1}>
-          <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={6} width={dotFullW()} pct={usedPct()} />
-        </box>
+        <Show when={showSummary()}>
+          <Show
+            when={textSummary()}
+            fallback={
+              <box flexDirection="column">
+                {/* ── RAM — 7-row dot-matrix percentage display (5×7 font) ── */}
+                {/* Non-label rows go edge-to-edge. Label row (3) wraps "RAM" and value. */}
+                <box flexDirection="row" height={1} marginTop={1}>
+                  <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={0} width={dotFullW()} pct={usedPct()} />
+                </box>
+                <box flexDirection="row" height={1}>
+                  <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={1} width={dotFullW()} pct={usedPct()} />
+                </box>
+                <box flexDirection="row" height={1}>
+                  <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={2} width={dotFullW()} pct={usedPct()} />
+                </box>
+                <box flexDirection="row" height={1}>
+                  <text fg={titleColor()}>{"RAM "}</text>
+                  <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={3} width={dotLabelW()} pct={usedPct()} leftMargin={4} refWidth={dotFullW()} />
+                  <text fg="#8b949e">{"  " + ramValStr()}</text>
+                </box>
+                <box flexDirection="row" height={1}>
+                  <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={4} width={dotFullW()} pct={usedPct()} />
+                </box>
+                <box flexDirection="row" height={1}>
+                  <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={5} width={dotFullW()} pct={usedPct()} />
+                </box>
+                <box flexDirection="row" height={1}>
+                  <DotMatrixRow label={Math.round(usedPct() * 100).toString()} row={6} width={dotFullW()} pct={usedPct()} />
+                </box>
+              </box>
+            }
+          >
+            <box flexDirection="row" height={1} marginTop={1}>
+              <text fg={titleColor()}>RAM </text>
+              <text fg="#8b949e">{ramValStr()}</text>
+              <text fg="#4d5566">{"  "}</text>
+              <text fg={digitColor(usedPct())}>{ramPctStr()}</text>
+            </box>
+          </Show>
 
-        {/* ── Memory breakdown (expanded) ────────────── */}
-        <Show when={props.expanded}>
-          <box flexDirection="row" height={1}>
-            <text fg="#4d5566">{"  app".padEnd(8)}</text>
-            <AnimatedBar pct={appPct()} width={memBarW()} fg="#58a6ff" emptyFg="#21262d" />
-            <text fg="#4d5566">{memVal(fmtMB(appMB()))}</text>
-          </box>
-          <box flexDirection="row" height={1}>
-            <text fg="#4d5566">{"  wired".padEnd(8)}</text>
-            <AnimatedBar pct={wiredPct()} width={memBarW()} fg="#4d5566" emptyFg="#21262d" />
-            <text fg="#4d5566">{memVal(fmtMB(wiredMB()))}</text>
-          </box>
-          <box flexDirection="row" height={1}>
-            <text fg="#d29922">{"  comp".padEnd(8)}</text>
-            <AnimatedBar pct={compPct()} width={memBarW()} fg="#d29922" emptyFg="#21262d" />
-            <text fg="#d29922">{memVal(fmtMB(compMB()))}</text>
-          </box>
-          <box flexDirection="row" height={1}>
-            <text fg="#4d5566">{"  cached".padEnd(8)}</text>
-            <AnimatedBar pct={cachedPct()} width={memBarW()} fg="#30363d" emptyFg="#21262d" />
-            <text fg="#4d5566">{memVal(fmtMB(cachedMB()))}</text>
-          </box>
-          <box flexDirection="row" height={1}>
-            <text fg="#4d5566">{"  free".padEnd(8)}</text>
-            <AnimatedBar pct={freeMB() / totalMB()} width={memBarW()} fg="#2d333b" emptyFg="#21262d" />
-            <text fg="#4d5566">{memVal(fmtMB(freeMB()))}</text>
-          </box>
-          <box flexDirection="row" height={hasSwap() ? 1 : 0}>
-            <text fg={swapPct() > 0.5 ? "#d29922" : "#4d5566"}>{"  swap".padEnd(8)}</text>
-            <AnimatedBar pct={swapPct()} width={memBarW()} fg={swapPct() > 0.5 ? "#d29922" : "#4d5566"} emptyFg="#21262d" />
-            <text fg={swapPct() > 0.5 ? "#d29922" : "#4d5566"}>{memVal(swapValStr())}</text>
+          {/* ── Memory breakdown (expanded) ────────────── */}
+          <Show when={props.expanded}>
+            <box flexDirection="row" height={1}>
+              <text fg="#4d5566">{"  app".padEnd(8)}</text>
+              <AnimatedBar pct={appPct()} width={memBarW()} fg="#58a6ff" emptyFg="#21262d" />
+              <text fg="#4d5566">{memVal(fmtMB(appMB()))}</text>
+            </box>
+            <box flexDirection="row" height={1}>
+              <text fg="#4d5566">{"  wired".padEnd(8)}</text>
+              <AnimatedBar pct={wiredPct()} width={memBarW()} fg="#4d5566" emptyFg="#21262d" />
+              <text fg="#4d5566">{memVal(fmtMB(wiredMB()))}</text>
+            </box>
+            <box flexDirection="row" height={1}>
+              <text fg="#d29922">{"  comp".padEnd(8)}</text>
+              <AnimatedBar pct={compPct()} width={memBarW()} fg="#d29922" emptyFg="#21262d" />
+              <text fg="#d29922">{memVal(fmtMB(compMB()))}</text>
+            </box>
+            <box flexDirection="row" height={1}>
+              <text fg="#4d5566">{"  cached".padEnd(8)}</text>
+              <AnimatedBar pct={cachedPct()} width={memBarW()} fg="#30363d" emptyFg="#21262d" />
+              <text fg="#4d5566">{memVal(fmtMB(cachedMB()))}</text>
+            </box>
+            <box flexDirection="row" height={1}>
+              <text fg="#4d5566">{"  free".padEnd(8)}</text>
+              <AnimatedBar pct={freeMB() / totalMB()} width={memBarW()} fg="#2d333b" emptyFg="#21262d" />
+              <text fg="#4d5566">{memVal(fmtMB(freeMB()))}</text>
+            </box>
+            <box flexDirection="row" height={hasSwap() ? 1 : 0}>
+              <text fg={swapPct() > 0.5 ? "#d29922" : "#4d5566"}>{"  swap".padEnd(8)}</text>
+              <AnimatedBar pct={swapPct()} width={memBarW()} fg={swapPct() > 0.5 ? "#d29922" : "#4d5566"} emptyFg="#21262d" />
+              <text fg={swapPct() > 0.5 ? "#d29922" : "#4d5566"}>{memVal(swapValStr())}</text>
+            </box>
+          </Show>
+        </Show>
+
+        <Show when={showSummary() && showProcesses()}>
+          <box marginTop={1}>
+            <text fg="#21262d">{"─".repeat(Math.max(10, panelW()))}</text>
           </box>
         </Show>
 
-        {/* Divider */}
-        <box marginTop={1}>
-          <text fg="#21262d">{"─".repeat(Math.max(10, panelW()))}</text>
-        </box>
+        <Show when={showProcesses()}>
+          {/* ── Processes table ─────────────────────────── */}
+          <box flexDirection="row" marginTop={1} marginBottom={1}>
+            <text fg={titleColor()}>procs  </text>
+            <text fg="#4d5566">{totalProcCount()}</text>
+          </box>
+          <box flexDirection="row" height={1} marginBottom={0}>
+            <text fg="#4d5566">{"  " + "name".padEnd(procNameW())}</text>
+            <text fg="#4d5566">{" " + "usage".padEnd(procBarW())}</text>
+            <text fg="#4d5566">{"mem".padStart(valW())}</text>
+          </box>
 
-        {/* ── Processes table ─────────────────────────── */}
-        <box flexDirection="row" marginTop={1} marginBottom={1}>
-          <text fg={titleColor()}>procs  </text>
-          <text fg="#4d5566">{totalProcCount()}</text>
-        </box>
-        <box flexDirection="row" height={1} marginBottom={0}>
-          <text fg="#4d5566">{"  " + "name".padEnd(procNameW())}</text>
-          <text fg="#4d5566">{" " + "usage".padEnd(procBarW())}</text>
-          <text fg="#4d5566">{"mem".padStart(valW())}</text>
-        </box>
-
-        <scrollbox
-          ref={(el: any) => { if (el?.verticalScrollBar) el.verticalScrollBar.visible = false; }}
-          flexGrow={1} focused={props.focused} style={SCROLL_STYLE}
-        >
-          <For each={procGroups()}>
-            {(group, idx) => {
-              const selected = () => props.focused && idx() === (props.selectedIndex ?? 0);
-              const isInlineExpanded = () => idx() === (props.expandedIndex ?? -1);
-              const color = procColor(group.totalMB, totalMB());
-              const nameW  = procNameW();
-              const marker = () => selected() ? "▸ " : "  ";
-              const rawLabel = group.count > 1 ? `${group.name} ×${group.count}` : group.name;
-              return (
-                <box flexDirection="column">
-                  <box flexDirection="row" height={1} backgroundColor={selected() ? "#161b22" : undefined}>
-                    <text fg={selected() ? "#c9d1d9" : color}>{marker() + rawLabel.slice(0, nameW).padEnd(nameW)}</text>
-                    <text fg="#30363d">{" "}</text>
-                    <AnimatedBar pct={group.totalMB / maxGroupMem()} width={procBarW()} fg={selected() ? "#c9d1d9" : color} emptyFg="#21262d" />
-                    <text fg={selected() ? "#c9d1d9" : color}>{memVal(fmtMB(group.totalMB))}</text>
+          <scrollbox
+            ref={(el: any) => { if (el?.verticalScrollBar) el.verticalScrollBar.visible = false; }}
+            flexGrow={1} focused={props.focused} style={SCROLL_STYLE}
+          >
+            <For each={procGroups()}>
+              {(group, idx) => {
+                const selected = () => props.focused && idx() === (props.selectedIndex ?? 0);
+                const isInlineExpanded = () => idx() === (props.expandedIndex ?? -1);
+                const color = procColor(group.totalMB, totalMB());
+                const nameW  = procNameW();
+                const marker = () => selected() ? "▸ " : "  ";
+                const rawLabel = group.count > 1 ? `${group.name} ×${group.count}` : group.name;
+                return (
+                  <box flexDirection="column">
+                    <box flexDirection="row" height={1} backgroundColor={selected() ? "#161b22" : undefined}>
+                      <text fg={selected() ? "#c9d1d9" : color}>{marker() + rawLabel.slice(0, nameW).padEnd(nameW)}</text>
+                      <text fg="#30363d">{" "}</text>
+                      <AnimatedBar pct={group.totalMB / maxGroupMem()} width={procBarW()} fg={selected() ? "#c9d1d9" : color} emptyFg="#21262d" animate={props.animateProcessBars} />
+                      <text fg={selected() ? "#c9d1d9" : color}>{memVal(fmtMB(group.totalMB))}</text>
+                    </box>
+                    <Show when={isInlineExpanded()}>
+                      <For each={group.procs}>
+                        {(proc) => {
+                          const pColor = procColor(proc.memMB, totalMB());
+                          return (
+                            <box flexDirection="row" height={1}>
+                              <text fg="#6e7681">{"    " + proc.pid.padEnd(8)}</text>
+                              <text fg={pColor}>{fmtMB(proc.memMB).padStart(5)}</text>
+                              <text fg="#4d5566">{"  "}</text>
+                              <text fg="#6e7681">{proc.args.slice(0, Math.max(10, panelW() - 20))}</text>
+                            </box>
+                          );
+                        }}
+                      </For>
+                    </Show>
                   </box>
-                  <Show when={isInlineExpanded()}>
-                    <For each={group.procs}>
-                      {(proc) => {
-                        const pColor = procColor(proc.memMB, totalMB());
-                        return (
-                          <box flexDirection="row" height={1}>
-                            <text fg="#6e7681">{"    " + proc.pid.padEnd(8)}</text>
-                            <text fg={pColor}>{fmtMB(proc.memMB).padStart(5)}</text>
-                            <text fg="#4d5566">{"  "}</text>
-                            <text fg="#6e7681">{proc.args.slice(0, Math.max(10, panelW() - 20))}</text>
-                          </box>
-                        );
-                      }}
-                    </For>
-                  </Show>
-                </box>
-              );
-            }}
-          </For>
-        </scrollbox>
+                );
+              }}
+            </For>
+          </scrollbox>
+        </Show>
 
         {/* ── Alerts ──────────────────────────────────── */}
-        <Show when={alerts().length > 0}>
+        <Show when={showAlerts() && alerts().length > 0}>
           <box marginTop={1}>
             <text fg="#21262d">{"─".repeat(Math.max(10, panelW()))}</text>
           </box>

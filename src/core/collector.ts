@@ -2,10 +2,15 @@ import type {
   SystemInfo, TopProc, TmuxPane, ProcessInfo,
   DockerInfo, SessionSummary, Anomaly, AuditData,
 } from "./types";
+import { benchmark } from "../bench/runtime";
 
 async function run(cmd: string[]): Promise<string> {
+  const startedAt = performance.now();
   const proc = Bun.spawn(cmd, { stdout: "pipe", stderr: "ignore" });
-  return await new Response(proc.stdout).text();
+  const stdout = await new Response(proc.stdout).text();
+  const exitCode = await proc.exited;
+  benchmark.recordCommand(cmd, performance.now() - startedAt, exitCode, stdout.length);
+  return stdout;
 }
 
 export async function collectSystem(): Promise<SystemInfo> {

@@ -12,3 +12,4 @@ scripts/captures/
 .claude/
 skills-lock.json
 kb/
+benchmarks/results/
