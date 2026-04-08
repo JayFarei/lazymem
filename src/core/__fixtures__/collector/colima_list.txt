@@ -1,0 +1,2 @@
+PROFILE    STATUS     ARCH       CPUS    MEMORY    DISK      RUNTIME    ADDRESS
+default    Running    aarch64    4       8GiB      100GiB    vz         N/A

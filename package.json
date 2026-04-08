@@ -27,8 +27,10 @@
   "scripts": {
     "dev": "bun --preload=./node_modules/@opentui/solid/scripts/preload.ts src/index.tsx",
     "start": "bun --preload=./node_modules/@opentui/solid/scripts/preload.ts src/index.tsx",
+    "test": "bun test",
     "benchmark:startup": "bun run scripts/benchmark-startup.ts",
-    "benchmark:startup:quick": "bun run scripts/benchmark-startup.ts --warmups 0 --runs 3 --idle-ms 1500"
+    "benchmark:startup:quick": "bun run scripts/benchmark-startup.ts --warmups 0 --runs 3 --idle-ms 1500",
+    "benchmark:compare": "bun run scripts/benchmark-compare.ts"
   },
   "dependencies": {
     "@opentui/core": "0.1.77",

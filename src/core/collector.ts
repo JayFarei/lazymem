@@ -13,14 +13,7 @@ async function run(cmd: string[]): Promise<string> {
   return stdout;
 }
 
-export async function collectSystem(): Promise<SystemInfo> {
-  // hw.memsize: ground-truth physical RAM in bytes
-  const [vmstatOut, memsizeOut, swapOut] = await Promise.all([
-    run(["vm_stat"]),
-    run(["sysctl", "-n", "hw.memsize"]),
-    run(["sysctl", "-n", "vm.swapusage"]),
-  ]);
-
+export function parseSystemInfo(vmstatOut: string, memsizeOut: string, swapOut: string): SystemInfo {
   // Parse page size from "Mach Virtual Memory Statistics: (page size of N bytes)"
   const pageSizeMatch = vmstatOut.match(/page size of (\d+) bytes/);
   const pageSize = pageSizeMatch ? parseInt(pageSizeMatch[1]) : 16384;
@@ -31,8 +24,6 @@ export async function collectSystem(): Promise<SystemInfo> {
     return m ? parseInt(m[1]) : 0;
   }
   const freePages        = pages("Pages free");
-  const activePages      = pages("Pages active");
-  const inactivePages    = pages("Pages inactive");
   const specPages        = pages("Pages speculative");
   const wiredPages       = pages("Pages wired down");
   const compPages        = pages("Pages occupied by compressor");
@@ -61,7 +52,18 @@ export async function collectSystem(): Promise<SystemInfo> {
   return { totalMB, appMB, wiredMB, compMB, cachedMB, freeMB, usedMB, swap };
 }
 
-function extractProcName(args: string): string {
+export async function collectSystem(): Promise<SystemInfo> {
+  // hw.memsize: ground-truth physical RAM in bytes
+  const [vmstatOut, memsizeOut, swapOut] = await Promise.all([
+    run(["vm_stat"]),
+    run(["sysctl", "-n", "hw.memsize"]),
+    run(["sysctl", "-n", "vm.swapusage"]),
+  ]);
+
+  return parseSystemInfo(vmstatOut, memsizeOut, swapOut);
+}
+
+export function extractProcName(args: string): string {
   // macOS .app bundle: /Applications/Foo Bar.app/... → "Foo Bar"
   const appMatch = args.match(/\/([^/]+)\.app\//);
   if (appMatch) return appMatch[1];
@@ -74,8 +76,7 @@ function extractProcName(args: string): string {
   return firstWord;
 }
 
-export async function collectTopProcs(): Promise<TopProc[]> {
-  const out = await run(["ps", "-eo", "pid,rss,args"]);
+export function parseTopProcsOutput(out: string): TopProc[] {
   return out
     .split("\n")
     .filter((l) => l.trim())
@@ -94,26 +95,34 @@ export async function collectTopProcs(): Promise<TopProc[]> {
     .slice(0, 80) as TopProc[];
 }
 
+export async function collectTopProcs(): Promise<TopProc[]> {
+  const out = await run(["ps", "-eo", "pid,rss,args"]);
+  return parseTopProcsOutput(out);
+}
+
+export function parseTmuxPanesOutput(out: string): TmuxPane[] {
+  return out
+    .split("\n")
+    .filter((l) => l.includes("\t"))
+    .map((l) => {
+      const [session, pane, tty, cmd, path] = l.split("\t");
+      return { session, pane, tty, cmd, path };
+    });
+}
+
 export async function collectTmux(): Promise<TmuxPane[]> {
   try {
     const out = await run([
       "tmux", "list-panes", "-a", "-F",
       "#{session_name}\t#{window_index}.#{pane_index}\t#{pane_tty}\t#{pane_current_command}\t#{pane_current_path}",
     ]);
-    return out
-      .split("\n")
-      .filter((l) => l.includes("\t"))
-      .map((l) => {
-        const [session, pane, tty, cmd, path] = l.split("\t");
-        return { session, pane, tty, cmd, path };
-      });
+    return parseTmuxPanesOutput(out);
   } catch {
     return [];
   }
 }
 
-export async function collectProcesses(): Promise<ProcessInfo[]> {
-  const out = await run(["ps", "-eo", "pid,tty,rss,comm,args"]);
+export function parseProcessesOutput(out: string): ProcessInfo[] {
   const results: ProcessInfo[] = [];
   for (const line of out.split("\n")) {
     const trimmed = line.trim();
@@ -129,6 +138,38 @@ export async function collectProcesses(): Promise<ProcessInfo[]> {
   return results;
 }
 
+export async function collectProcesses(): Promise<ProcessInfo[]> {
+  const out = await run(["ps", "-eo", "pid,tty,rss,comm,args"]);
+  return parseProcessesOutput(out);
+}
+
+export function parseDockerContainers(statsOut: string, psOut: string): DockerInfo["containers"] {
+  const imageMap = new Map<string, string>();
+  for (const l of psOut.split("\n").filter((line) => line.includes("\t"))) {
+    const [name, image] = l.split("\t");
+    imageMap.set(name.trim(), image.trim());
+  }
+
+  return statsOut
+    .split("\n")
+    .filter((line) => line.includes("\t"))
+    .map((line) => {
+      const [name, mem, cpu] = line.split("\t");
+      return { name, mem, cpu, image: imageMap.get(name) };
+    });
+}
+
+export function parseColimaAlloc(out: string): string {
+  const lastLine = out.split("\n").filter((l) => l.trim()).pop() ?? "";
+  return lastLine.split(/\s+/)[4] ?? "N/A";
+}
+
+export function parseDockerVmActual(out: string): number {
+  const vmLine = out.split("\n").find((l) => l.includes("com.apple.Virtua"));
+  if (!vmLine) return 0;
+  return Math.round(parseInt(vmLine.trim().split(/\s+/)[1]) / 1024);
+}
+
 export async function collectDocker(): Promise<DockerInfo> {
   let containers: DockerInfo["containers"] = [];
   let colimaAlloc = "N/A";
@@ -139,32 +180,17 @@ export async function collectDocker(): Promise<DockerInfo> {
       run(["docker", "stats", "--no-stream", "--format", "{{.Name}}\t{{.MemUsage}}\t{{.CPUPerc}}"]),
       run(["docker", "ps", "--format", "{{.Names}}\t{{.Image}}"]),
     ]);
-    const imageMap = new Map<string, string>();
-    for (const l of psOut.split("\n").filter((l) => l.includes("\t"))) {
-      const [n, img] = l.split("\t");
-      imageMap.set(n.trim(), img.trim());
-    }
-    containers = statsOut
-      .split("\n")
-      .filter((l) => l.includes("\t"))
-      .map((l) => {
-        const [name, mem, cpu] = l.split("\t");
-        return { name, mem, cpu, image: imageMap.get(name) };
-      });
+    containers = parseDockerContainers(statsOut, psOut);
   } catch {}
 
   try {
     const colimaOut = await run(["colima", "list"]);
-    const lastLine = colimaOut.split("\n").filter((l) => l.trim()).pop() ?? "";
-    colimaAlloc = lastLine.split(/\s+/)[4] ?? "N/A";
+    colimaAlloc = parseColimaAlloc(colimaOut);
   } catch {}
 
   try {
     const vmOut = await run(["ps", "-eo", "pid,rss,comm"]);
-    const vmLine = vmOut.split("\n").find((l) => l.includes("com.apple.Virtua"));
-    if (vmLine) {
-      vmActual = Math.round(parseInt(vmLine.trim().split(/\s+/)[1]) / 1024);
-    }
+    vmActual = parseDockerVmActual(vmOut);
   } catch {}
 
   return { containers, colimaAlloc, vmActual };

@@ -1,0 +1,2 @@
+api	ghcr.io/acme/api:latest
+db	postgres:16

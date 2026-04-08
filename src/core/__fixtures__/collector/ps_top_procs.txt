@@ -1,0 +1,4 @@
+  PID    RSS ARGS
+  123 1048576 /Applications/Slack.app/Contents/MacOS/Slack
+  456 2097152 /usr/bin/python3 /tmp/script.py
+  789  512000 node /Users/me/app/server.js

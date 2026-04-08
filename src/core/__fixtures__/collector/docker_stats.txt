@@ -1,0 +1,2 @@
+api	512MiB / 8GiB	23.4%
+db	1.25GiB / 8GiB	101.2%

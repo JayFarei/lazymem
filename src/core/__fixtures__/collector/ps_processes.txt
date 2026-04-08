@@ -1,0 +1,5 @@
+  PID TTY      RSS COMM             ARGS
+  123 ttys001 512000 claude /usr/local/bin/claude chat
+  234 ??      256000 node /Users/me/app/node /Users/me/app/server.js
+  345 ttys002 128000 Finder /System/Library/CoreServices/Finder.app/Contents/MacOS/Finder
+  456 ttys003  64000 bun bun run dev --watch alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma tau upsilon phi chi psi omega

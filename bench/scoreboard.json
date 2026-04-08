@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "updatedAt": "2026-04-08T19:57:27Z",
+  "notes": [
+    "This file is the tracked scorecard for accepted and diagnostic benchmark results.",
+    "Raw benchmark artifacts live under benchmarks/results/ and are ignored by git; promote important results here."
+  ],
+  "acceptedDefaultBaselines": [
+    {
+      "label": "campaign-baseline",
+      "measuredAt": "2026-04-08T14:50:30Z",
+      "commit": "pre-b79b773-working-tree",
+      "source": "benchmarks/results/startup-2026-04-08T14-50-30Z.json",
+      "medians": {
+        "cliToCoreReadyMs": 387,
+        "cliToFullReadyMs": 2668,
+        "rssAtFullReadyMB": 216.6,
+        "rssAfterIdleMB": 233.4,
+        "peakRssMB": 233.4
+      },
+      "notes": [
+        "Initial accepted default baseline before startup optimization work."
+      ]
+    },
+    {
+      "label": "current-head",
+      "measuredAt": "2026-04-08T16:57:51Z",
+      "commit": "b79b773",
+      "source": "benchmarks/results/startup-2026-04-08T16-57-51Z.json",
+      "medians": {
+        "cliToCoreReadyMs": 368,
+        "cliToFullReadyMs": 602,
+        "rssAtFullReadyMB": 229.4,
+        "rssAfterIdleMB": 250.8,
+        "peakRssMB": 250.8
+      },
+      "notes": [
+        "Accepted default baseline after deferring Docker collection off the initial ready path."
+      ]
+    }
+  ],
+  "defaultComparisons": [
+    {
+      "label": "pre-docker-deferral-vs-b79b773",
+      "measuredAt": "2026-04-08T16:57:51Z",
+      "previous": {
+        "label": "pre-docker-deferral-behavior",
+        "commit": "b79b773-worktree-patched",
+        "source": "detached worktree benchmark with App startup flow reverted to block on Docker before fullReady",
+        "medians": {
+          "cliToCoreReadyMs": 376,
+          "cliToFullReadyMs": 2785,
+          "rssAtFullReadyMB": 239.3,
+          "rssAfterIdleMB": 276.9,
+          "peakRssMB": 276.9
+        }
+      },
+      "current": {
+        "label": "b79b773",
+        "commit": "b79b773",
+        "source": "benchmarks/results/startup-2026-04-08T16-57-51Z.json",
+        "medians": {
+          "cliToCoreReadyMs": 368,
+          "cliToFullReadyMs": 602,
+          "rssAtFullReadyMB": 229.4,
+          "rssAfterIdleMB": 250.8,
+          "peakRssMB": 250.8
+        }
+      },
+      "delta": {
+        "cliToCoreReadyMs": -8,
+        "cliToFullReadyMs": -2183,
+        "rssAtFullReadyMB": -9.9,
+        "rssAfterIdleMB": -26.1,
+        "peakRssMB": -26.1
+      },
+      "notes": [
+        "Measured back-to-back with the same benchmark harness to isolate the accepted startup-path change."
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "label": "shell-floor",
+      "benchmarkMode": "shell",
+      "measuredAt": "2026-04-08T15:29:40Z",
+      "source": "benchmarks/results/latest-shell.json",
+      "medians": {
+        "cliToCoreReadyMs": 226,
+        "cliToFullReadyMs": 226,
+        "rssAtFullReadyMB": 121.0,
+        "rssAfterIdleMB": 123.9,
+        "peakRssMB": 123.9
+      },
+      "notes": [
+        "Renderer and framework floor alone remained 53.9 MB above the 70 MB idle target."
+      ]
+    },
+    {
+      "label": "system-isolated-no-procs",
+      "benchmarkMode": "system-isolated-no-procs",
+      "measuredAt": "2026-04-08T16:20:05Z",
+      "source": "benchmarks/results/latest-system-isolated-no-procs.json",
+      "medians": {
+        "cliToCoreReadyMs": 317,
+        "cliToFullReadyMs": 2631,
+        "rssAtFullReadyMB": 173.4,
+        "rssAfterIdleMB": 175.5,
+        "peakRssMB": 175.5
+      }
+    },
+    {
+      "label": "system-isolated-procs-only",
+      "benchmarkMode": "system-isolated-procs-only",
+      "measuredAt": "2026-04-08T16:29:35Z",
+      "source": "benchmarks/results/latest-system-isolated-procs-only.json",
+      "medians": {
+        "cliToCoreReadyMs": 323,
+        "cliToFullReadyMs": 2649,
+        "rssAtFullReadyMB": 190.0,
+        "rssAfterIdleMB": 202.9,
+        "peakRssMB": 202.9
+      },
+      "notes": [
+        "The process-table subtree alone accounts for roughly 27 MB over isolated system summary without processes."
+      ]
+    },
+    {
+      "label": "system-isolated-text-summary",
+      "benchmarkMode": "system-isolated-text-summary",
+      "measuredAt": "2026-04-08T16:30:11Z",
+      "source": "benchmarks/results/latest-system-isolated-text-summary.json",
+      "medians": {
+        "cliToCoreReadyMs": 312,
+        "cliToFullReadyMs": 2494,
+        "rssAtFullReadyMB": 167.7,
+        "rssAfterIdleMB": 168.7,
+        "peakRssMB": 168.7
+      },
+      "notes": [
+        "Text summary helped in isolation, but that win did not survive on the default path."
+      ]
+    }
+  ]
+}
