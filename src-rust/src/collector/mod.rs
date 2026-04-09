@@ -10,6 +10,7 @@ use crate::state::{Anomaly, AnomalySeverity, AuditData};
 pub mod docker;
 pub mod processes;
 pub mod sessions;
+pub mod snapshot;
 pub mod system;
 pub mod tmux;
 

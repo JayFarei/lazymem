@@ -154,6 +154,7 @@ pub struct AppState {
     pub selected_index: usize,
     pub expanded_index: Option<usize>,
     pub should_quit: bool,
+    pub copied_until: Option<Instant>,
     pub status_message: Option<String>,
     pub error_message: Option<String>,
 }
@@ -170,6 +171,7 @@ impl AppState {
             selected_index: 0,
             expanded_index: None,
             should_quit: false,
+            copied_until: None,
             status_message: None,
             error_message: None,
         }

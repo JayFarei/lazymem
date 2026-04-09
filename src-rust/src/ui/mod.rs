@@ -1143,6 +1143,11 @@ fn render_status_bar(frame: &mut Frame, area: Rect, state: &AppState) {
         spans.push(Span::styled(" │ ", Style::default().fg(BORDER_DIM)));
     }
 
+    if state.copied_until.is_some() {
+        spans.push(Span::styled("✓ copied", Style::default().fg(AGENTS_FOCUS)));
+        spans.push(Span::styled(" │ ", Style::default().fg(BORDER_DIM)));
+    }
+
     spans.extend(key_hint("r", "fresh"));
     spans.push(Span::raw(" "));
     spans.extend(key_hint("Tab", "cycle"));
@@ -1197,18 +1202,23 @@ fn render_status_bar_compact(frame: &mut Frame, area: Rect, state: &AppState) {
         .as_ref()
         .map(|data| data.anomalies.len())
         .unwrap_or(0);
+    let copied = if state.copied_until.is_some() {
+        "│✓ copy"
+    } else {
+        ""
+    };
     let mut line = match state.focus {
         FocusPane::Sys => format!(
-            "lazyme│ {live}│{totals}│ {alerts}│sys │ rfreshTab cycle1-4focusj/k navg fullc copy?helpq quit"
+            "lazyme│ {live}│{totals}│ {alerts}│sys {copied}│ rfreshTab cycle1-4focusj/k navg fullc copy?helpq quit"
         ),
         FocusPane::Agents => format!(
-            "lazyme│ {live}│{totals}│⚠⚠ {alert_count}│ agents│r freshTabcycle1-4     j/k navg fullc copy? helpqqui"
+            "lazyme│ {live}│{totals}│⚠⚠ {alert_count}│ agents{copied}│r freshTabcycle1-4     j/k navg fullc copy? helpqqui"
         ),
         FocusPane::Dev => format!(
-            "lazyme│ {live}│{totals}│ {alerts}│dev │ rfreshTab cycle1-4focusj/k navg fullc copy?helpq quit"
+            "lazyme│ {live}│{totals}│ {alerts}│dev {copied}│ rfreshTab cycle1-4focusj/k navg fullc copy?helpq quit"
         ),
         FocusPane::Docker => format!(
-            "lazyme│ {live}│{totals}│⚠⚠ {alert_count}│ docker│r freshTabcycle1-4     j/k navg fullc copy? helpqqui"
+            "lazyme│ {live}│{totals}│⚠⚠ {alert_count}│ docker{copied}│r freshTabcycle1-4     j/k navg fullc copy? helpqqui"
         ),
     };
     line = pad_right(&line, area.width as usize);

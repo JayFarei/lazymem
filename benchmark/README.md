@@ -13,6 +13,7 @@ This folder is the single home for the OpenTUI vs RatatUI benchmark tooling, tra
 
 The two artifacts that matter most are:
 
+- `report.md`
 - `results/latest-head-to-head.md`
 - `results/latest-opentui.json` and `results/latest-ratatui.json`
 

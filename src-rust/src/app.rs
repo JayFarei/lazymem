@@ -16,12 +16,14 @@ use tokio::task::JoinHandle;
 use crate::bench::report::BenchmarkRuntime;
 use crate::collector::{
     Wave1Data, Wave2Data, build_audit_data, collect_wave1, docker, load_fixture_from_env, processes,
+    snapshot,
 };
 use crate::state::{AppState, DockerInfo, FocusPane};
 use crate::ui;
 
 const MIN_SPLASH_DURATION: Duration = Duration::from_millis(300);
 const POLL_INTERVAL: Duration = Duration::from_millis(200);
+const COPIED_FLASH_DURATION: Duration = Duration::from_millis(2000);
 
 pub async fn run(benchmark: Arc<BenchmarkRuntime>) -> Result<()> {
     enable_raw_mode()?;
@@ -60,6 +62,13 @@ async fn run_loop(
     .await?;
 
     loop {
+        if state
+            .copied_until
+            .is_some_and(|deadline| std::time::Instant::now() >= deadline)
+        {
+            state.copied_until = None;
+        }
+
         if let Some(handle) = pending_docker.as_ref() {
             if handle.is_finished() {
                 if let Ok(Ok(docker_info)) = pending_docker
@@ -117,8 +126,20 @@ async fn run_loop(
             KeyCode::Enter if !state.show_help => state.toggle_expand(),
             KeyCode::Char('g') if !state.show_help => state.toggle_fullscreen(),
             KeyCode::Char('c') if !state.show_help => {
-                state.status_message =
-                    Some("snapshot clipboard wiring lands in Phase 5".to_string())
+                if let Some(data) = &state.data {
+                    let snapshot = snapshot::serialize_snapshot(data, state.focus);
+                    match snapshot::copy_to_clipboard(&snapshot) {
+                        Ok(()) => {
+                            state.copied_until =
+                                Some(std::time::Instant::now() + COPIED_FLASH_DURATION);
+                            state.status_message = None;
+                        }
+                        Err(error) => {
+                            state.copied_until = None;
+                            state.error_message = Some(error.to_string());
+                        }
+                    }
+                }
             }
             KeyCode::Char('r') if !state.show_help => {
                 refresh_data(
@@ -158,6 +179,7 @@ async fn refresh_data(
     }
 
     state.loading = true;
+    state.copied_until = None;
     state.status_message = Some("refreshing...".to_string());
     terminal.draw(|frame| ui::render(frame, state)).ok();
 

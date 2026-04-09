@@ -67,7 +67,7 @@ This installs the `lazymem` binary from the Rust crate in this repository.
 
 `cargo install` only installs the binary. If you also want the bundled Claude skill assets, use the Homebrew or curl install path instead.
 
-If you are hacking locally instead:
+If you want the local Rust install path for benchmark or parity work:
 
 ```sh
 cargo install --path src-rust
@@ -88,7 +88,16 @@ cargo build --release --manifest-path src-rust/Cargo.toml
 
 ## Benchmark
 
-The current OpenTUI vs RatatUI comparison lives under:
+Latest head-to-head benchmark snapshot:
+
+- latency: RatatUI reached `core ready` in `315 ms` vs `376 ms`, and `full ready` in `526 ms` vs `611 ms`
+- main-process memory: RatatUI used `4.7 MB` RSS at full ready vs `244.5 MB`, and `7.0 MB` after idle vs `263.8 MB`
+
+Report:
+
+- [benchmark/report.md](benchmark/report.md)
+
+Underlying summaries:
 
 - `benchmark/results/latest-head-to-head.md`
 - `benchmark/results/latest-opentui.json`
