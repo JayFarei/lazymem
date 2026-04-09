@@ -1,7 +1,7 @@
 {
   "name": "lazymem",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Terminal UI memory monitor for macOS dev environments",
   "type": "module",
   "license": "MIT",
