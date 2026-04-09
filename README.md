@@ -9,6 +9,8 @@
 
 If you're running multiple Claude/Codex agents across tmux sessions, a handful of dev servers, and Docker containers on the side, your Mac's memory disappears fast. lazymem gives you a single dashboard to see where it's all going, and an agent-native way to clean it up.
 
+This is a very personal tool, not a generic system monitor. It is built around one workflow: macOS, named tmux sessions, multiple AI agent sessions, dev servers, and a bit of Docker. If your setup does not look broadly like that, expect rough edges or missing context rather than a polished general-purpose experience.
+
 ![lazymem screenshot](screenshot.png)
 
 The OpenTUI implementation stays in-tree for parity work and benchmarking. The user-facing release story is now Rust-first.
@@ -51,8 +53,7 @@ The skill can also parse lazymem snapshots directly, so you don't need to wait f
 ### Homebrew
 
 ```sh
-brew tap JayFarei/homebrew-tap
-brew install lazymem
+brew install JayFarei/tap/lazymem
 ```
 
 ### cargo
