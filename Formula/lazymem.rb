@@ -2,7 +2,7 @@ class Lazymem < Formula
   desc "Terminal UI memory monitor for macOS dev environments"
   homepage "https://github.com/JayFarei/lazymem"
   license "MIT"
-  version "0.1.1"
+  version "0.2.0"
   head "https://github.com/JayFarei/lazymem.git", branch: "main"
 
   on_macos do
