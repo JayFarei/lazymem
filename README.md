@@ -51,7 +51,7 @@ The skill can also parse lazymem snapshots directly, so you don't need to wait f
 ### Homebrew
 
 ```sh
-brew tap JayFarei/tap
+brew tap JayFarei/homebrew-tap
 brew install lazymem
 ```
 
