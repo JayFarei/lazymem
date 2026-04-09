@@ -230,8 +230,9 @@ async function runOnce(input: {
 }): Promise<RunResult> {
   const reportPath = join(input.tempDir, `${input.label}.json`);
   const cliStartedAt = Date.now();
+  const benchmarkBin = process.env.LAZYMEM_BENCHMARK_BIN ?? "./bin/lazymem";
   const proc = Bun.spawn(
-    ["/usr/bin/script", "-q", "/dev/null", "./bin/lazymem"],
+    ["/usr/bin/script", "-q", "/dev/null", benchmarkBin],
     {
       cwd: input.repoRoot,
       stdout: "pipe",

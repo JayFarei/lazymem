@@ -6,6 +6,7 @@ import {
   buildSessions,
 } from "../core/index";
 import type { AuditData, DockerInfo } from "../core/index";
+import { fixturePath, loadFixture } from "../core/index";
 import { SystemPanel } from "./components/SystemPanel";
 import { AgentPanel } from "./components/AgentPanel";
 import { DockerPanel } from "./components/DockerPanel";
@@ -74,6 +75,7 @@ export function App() {
       ? "no-procs"
       : "full";
   const benchmarkSystemSummaryMode = benchmarkMode === "system-text-summary" ? "text" : "full";
+  const fixture = fixturePath();
 
   const [data, setData]         = createSignal<AuditData | null>(null);
   const [loading, setLoading]   = createSignal(true);
@@ -169,6 +171,28 @@ export function App() {
   let benchmarkExitTimer: ReturnType<typeof setTimeout> | undefined;
 
   async function refresh() {
+    if (fixture) {
+      setLoading(true);
+      const loaded = await loadFixture();
+      if (loaded) {
+        setData(loaded);
+        setLoading(false);
+        if (!ready()) {
+          setReady(true);
+          benchmark.markCoreReady();
+          if (benchmark.markFullReady() && !benchmarkExitTimer) {
+            benchmarkExitTimer = setTimeout(async () => {
+              benchmark.markIdle();
+              await benchmark.flush();
+              renderer.destroy();
+              process.exit(0);
+            }, benchmark.idleWaitMs);
+          }
+        }
+      }
+      return;
+    }
+
     setLoading(true);
 
     // Wave 1 — fast (~50ms): system info, tmux panes, process list
@@ -219,7 +243,7 @@ export function App() {
   let timer: ReturnType<typeof setInterval>;
   onMount(async () => {
     await refresh();
-    if (!benchmark.enabled) {
+    if (!benchmark.enabled && !fixture) {
       timer = setInterval(refresh, 10_000);
     }
   });

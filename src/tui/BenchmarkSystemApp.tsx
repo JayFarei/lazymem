@@ -4,6 +4,7 @@ import {
   collectSystem, collectTmux, collectTopProcs, collectProcesses, collectDocker, buildSessions,
 } from "../core/index";
 import type { AuditData, DockerInfo } from "../core/index";
+import { fixturePath, loadFixture } from "../core/index";
 import { SystemPanel } from "./components/SystemPanel";
 import { StatusBar } from "./components/StatusBar";
 import { benchmark } from "../bench/runtime";
@@ -40,6 +41,7 @@ export function App() {
       ? "no-procs"
       : "full";
   const summaryMode = mode === "system-isolated-text-summary" ? "text" : "full";
+  const fixture = fixturePath();
 
   const [data, setData] = createSignal<AuditData | null>(null);
   const [loading, setLoading] = createSignal(true);
@@ -47,6 +49,46 @@ export function App() {
   let benchmarkExitTimer: ReturnType<typeof setTimeout> | undefined;
 
   onMount(async () => {
+    if (fixture) {
+      const loaded = await loadFixture();
+      if (loaded) {
+        const storedTopProcs = noProcs ? [] : loaded.topProcs;
+        const storedProcesses = noProcs ? [] : loaded.processes;
+        const docker = loaded.docker ?? emptyDocker();
+        const { sessions, anomalies, totalInstances, totalClaudeMem } = buildSessions(storedProcesses, loaded.tmux);
+        const containerMem = docker.containers.reduce((sum, container) => sum + (parseFloat(container.mem) || 0), 0);
+        if (docker.vmActual > 500 && containerMem < docker.vmActual * 0.2) {
+          anomalies.push({
+            text: `Colima VM ${docker.colimaAlloc} for ${Math.round(containerMem)}MiB containers`,
+            severity: "warning",
+          });
+        }
+
+        setData({
+          ...loaded,
+          topProcs: storedTopProcs,
+          processes: storedProcesses,
+          docker,
+          sessions,
+          anomalies,
+          totalInstances,
+          totalClaudeMem,
+        });
+        setLoading(false);
+        setReady(true);
+        benchmark.markCoreReady();
+        if (benchmark.markFullReady()) {
+          benchmarkExitTimer = setTimeout(async () => {
+            benchmark.markIdle();
+            await benchmark.flush();
+            renderer.destroy();
+            process.exit(0);
+          }, benchmark.idleWaitMs);
+        }
+        return;
+      }
+    }
+
     const [system, tmux, topProcs] = await Promise.all([
       collectSystem(),
       collectTmux(),

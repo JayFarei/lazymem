@@ -145,6 +145,7 @@ export function DockerPanel(props: Props) {
                   ? ("  " + `${c.name.slice(0, cW - 14)} [${imgName.slice(0, 8)}${imgTag && imgTag !== "latest" ? `:${imgTag.slice(0, 4)}` : ""}]`).slice(0, cW - 1).padEnd(cW)
                   : ("  " + c.name.slice(0, cW - 3)).padEnd(cW);
                 const isInlineExpanded = () => idx() === (props.expandedIndex ?? -1);
+                const showDetails = () => !!props.expanded || isInlineExpanded();
                 const displayLabel = () => selected()
                   ? ("▸ " + c.name.slice(0, cW - 3)).padEnd(cW)
                   : label;
@@ -158,7 +159,7 @@ export function DockerPanel(props: Props) {
                       </Show>
                       <text fg={color()}>{fmtMB(memUsed).padStart(6)}</text>
                     </box>
-                    <Show when={isInlineExpanded()}>
+                    <Show when={showDetails()}>
                       <box flexDirection="row" height={1}>
                         <text fg="#4d5566">{"  name   "}</text>
                         <text fg="#e6edf3">{c.name.slice(0, Math.max(10, panelW() - 11))}</text>

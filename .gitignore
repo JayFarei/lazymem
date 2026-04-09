@@ -13,3 +13,4 @@ scripts/captures/
 skills-lock.json
 kb/
 benchmarks/results/
+src-rust/target/

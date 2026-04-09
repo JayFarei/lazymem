@@ -53,6 +53,7 @@ function extractService(args: string): string {
   const candidate = nmIdx > 0 ? args.slice(0, nmIdx) : args;
   for (const token of candidate.split(/\s+/).reverse()) {
     if (!token.startsWith("/")) continue;
+    if (token.includes("/.local/state/nvim/sessions/")) continue;
     const parts = token.split("/").filter((p) => p && !p.startsWith(".") && p !== "node_modules");
     if (parts.length >= 2) return parts[parts.length - 1];
   }
@@ -128,7 +129,7 @@ export function DevPanel(props: Props) {
       // and may match the node/claude filter — reject them via the raw-cmd fallback.
       if (isBackground && !inTmux && !KNOWN_DEV_TYPES.has(type)) continue;
       const folder = extractService(p.args);
-      const svc  = ttyToSession.get(p.tty) ?? pathToSession.get(folder) ?? folder;
+      const svc  = ttyToSession.get(p.tty) ?? pathToSession.get(folder) ?? (folder || "background");
       if (!byLabel.has(type)) byLabel.set(type, new Map());
       const sm = byLabel.get(type)!;
       const s = sm.get(svc) ?? { count: 0, mem: 0 };
@@ -219,7 +220,7 @@ export function DevPanel(props: Props) {
           {/* Header row */}
           <Show when={props.expanded}>
             <box flexDirection="row" marginTop={1} height={1}>
-              <text fg="#4d5566">{"  session".padEnd(serviceW() + 2)}</text>
+              <text fg="#4d5566">{"  service".padEnd(serviceW() + 2)}</text>
               <Show when={barWMag() >= 4}>
                 <text fg="#4d5566">{"usage".padEnd(barWMag() + 1)}</text>
               </Show>
@@ -246,11 +247,16 @@ export function DevPanel(props: Props) {
                     const rawLabel = entry.count > 1
                       ? `${entry.label} ×${entry.count}`
                       : entry.label;
+                    const sW = serviceW();
                     const hdr = () => (selected() ? "▸ " : "  ") +
-                      rawLabel.slice(0, panelW() - 7).padEnd(panelW() - 7);
+                      rawLabel.slice(0, sW).padEnd(sW);
                     return (
                       <box flexDirection="row" height={1} backgroundColor={selected() ? "#161b22" : undefined}>
                         <text fg={selected() ? "#e6edf3" : "#c9d1d9"}>{hdr()}</text>
+                        <Show when={barWMag() >= 4}>
+                          <AnimatedBar pct={entry.totalMem / maxGroupMem()} width={barWMag()} fg={color()} emptyFg="#21262d" />
+                          <text fg="#30363d"> </text>
+                        </Show>
                         <text fg={color()}>{fmtMB(entry.totalMem).padStart(5)}</text>
                       </box>
                     );
@@ -278,7 +284,7 @@ export function DevPanel(props: Props) {
                           {(s) => {
                             const sColor = memColor(s.mem);
                             const sW = mLW - 2;
-                            const sLabel = (s.count > 1 ? `  ${s.service} ×${s.count}` : `  ${s.service}`).slice(0, sW).padEnd(sW);
+                            const sLabel = (s.count > 1 ? `    ${s.service} ×${s.count}` : `    ${s.service}`).slice(0, sW).padEnd(sW);
                             return (
                               <box flexDirection="row" height={1}>
                                 <text fg="#6e7681">{sLabel}</text>
@@ -296,12 +302,12 @@ export function DevPanel(props: Props) {
                   );
                 }
 
-                // Magnified child row: "  "+session(serviceW) + bar + " " + mem(5)
+                // Magnified child row: child service label + bar + mem
                 const childColor = memColor(entry.mem);
                 const sW = serviceW();
                 const svcStr = (entry.count > 1
-                  ? `  ${entry.service} ×${entry.count}`
-                  : `  ${entry.service}`
+                  ? `    ${entry.service} ×${entry.count}`
+                  : `    ${entry.service}`
                 ).slice(0, sW + 2).padEnd(sW + 2);
                 return (
                   <box flexDirection="row" height={1}>

@@ -1,0 +1,37 @@
+#!/bin/sh
+set -e
+
+if [ "$(uname -s)" != "Darwin" ]; then
+  echo "lazymem-rs only supports macOS (uses vm_stat, sysctl, mach task_info)" >&2
+  exit 1
+fi
+
+resolve_link() {
+  local file="$1"
+  while [ -L "$file" ]; do
+    local dir
+    dir="$(cd "$(dirname "$file")" && pwd)"
+    file="$(readlink "$file")"
+    case "$file" in
+      /*) ;;
+      *) file="$dir/$file" ;;
+    esac
+  done
+  echo "$file"
+}
+
+SCRIPT="$(resolve_link "$0")"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT")" && pwd)"
+PACKAGE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+if [ -x "$PACKAGE_DIR/src-rust/target/release/lazymem" ]; then
+  exec "$PACKAGE_DIR/src-rust/target/release/lazymem" "$@"
+fi
+
+if [ -x "$PACKAGE_DIR/src-rust/target/debug/lazymem" ]; then
+  exec "$PACKAGE_DIR/src-rust/target/debug/lazymem" "$@"
+fi
+
+echo "lazymem-rs: build the Rust binary first:" >&2
+echo "  cargo build --manifest-path \"$PACKAGE_DIR/src-rust/Cargo.toml\"" >&2
+exit 1

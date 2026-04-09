@@ -1,5 +1,12 @@
 import { render } from "@opentui/solid";
 
+if (process.argv.includes("--collect-debug")) {
+  const { collectAll } = await import("./core/index");
+  const data = await collectAll();
+  console.log(JSON.stringify(data, null, 2));
+  process.exit(0);
+}
+
 if (process.argv.includes("--version") || process.argv.includes("-v")) {
   const pkg = await Bun.file(new URL("../package.json", import.meta.url)).json();
   console.log(`lazymem v${pkg.version}`);

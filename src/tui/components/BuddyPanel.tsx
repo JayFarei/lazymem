@@ -56,6 +56,9 @@ const MOOD_COLORS: Record<string, string> = {
 const IDLE_SEQ = [0, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 2, 0, 0, 0];
 const ANIM_MS = 500;
 const QUIP_MS = 20_000; // rotate quip every 20s (independent of data refresh)
+const DETERMINISTIC = process.env.LAZYMEM_DETERMINISTIC_BUDDY === "1"
+  || process.env.LAZYMEM_FIXTURE !== undefined
+  || process.env.LAZYMEM_BENCHMARK === "1";
 
 // ── Speech bubble ──────────────────────────────────────────────────
 
@@ -90,13 +93,13 @@ function buildBubble(text: string, maxW: number): string[] {
 export function BuddyPanel(props: Props) {
   // Animation tick (500ms) — drives sprite frames
   const [tick, setTick] = createSignal(0);
-  const animTimer = setInterval(() => setTick(t => t + 1), ANIM_MS);
-  onCleanup(() => clearInterval(animTimer));
+  const animTimer = DETERMINISTIC ? undefined : setInterval(() => setTick(t => t + 1), ANIM_MS);
+  onCleanup(() => { if (animTimer) clearInterval(animTimer); });
 
   // Quip rotation tick (20s) — drives which quip from the pool is shown
   const [quipIdx, setQuipIdx] = createSignal(0);
-  const quipTimer = setInterval(() => setQuipIdx(i => i + 1), QUIP_MS);
-  onCleanup(() => clearInterval(quipTimer));
+  const quipTimer = DETERMINISTIC ? undefined : setInterval(() => setQuipIdx(i => i + 1), QUIP_MS);
+  onCleanup(() => { if (quipTimer) clearInterval(quipTimer); });
 
   // Mood + pool recompute when data changes (instant, no flicker)
   const buddy = createMemo(() => getBuddyState(props.data));
