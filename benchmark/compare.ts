@@ -25,10 +25,12 @@ const METRICS: MetricKey[] = [
   "rssAfterIdleMB",
   "peakRssMB",
 ];
+const BENCHMARK_DIR = import.meta.dir;
+const REPO_ROOT = resolve(BENCHMARK_DIR, "..");
+const DEFAULT_HEAD_PATH = resolve(BENCHMARK_DIR, "results/latest.json");
 
 async function main() {
-  const repoRoot = resolve(import.meta.dir, "..");
-  const args = parseArgs(process.argv.slice(2), repoRoot);
+  const args = parseArgs(process.argv.slice(2));
   const [base, head] = await Promise.all([
     readSummary(args.base),
     readSummary(args.head),
@@ -51,24 +53,24 @@ async function main() {
   }
 }
 
-function parseArgs(argv: string[], repoRoot: string) {
+function parseArgs(argv: string[]) {
   let base = "";
-  let head = resolve(repoRoot, "benchmarks/results/latest.json");
+  let head = DEFAULT_HEAD_PATH;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     switch (arg) {
       case "--base":
-        base = resolve(argv[++index] ?? "");
+        base = resolve(REPO_ROOT, argv[++index] ?? "");
         break;
       case "--head":
-        head = resolve(argv[++index] ?? "");
+        head = resolve(REPO_ROOT, argv[++index] ?? "");
         break;
       default:
         if (!base) {
-          base = resolve(arg);
+          base = resolve(REPO_ROOT, arg);
         } else {
-          head = resolve(arg);
+          head = resolve(REPO_ROOT, arg);
         }
         break;
     }

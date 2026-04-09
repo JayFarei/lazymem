@@ -11,6 +11,8 @@ If you're running multiple Claude/Codex agents across tmux sessions, a handful o
 
 ![lazymem screenshot](screenshot.png)
 
+The OpenTUI implementation stays in-tree for parity work and benchmarking. The user-facing release story is now Rust-first.
+
 ## What it does
 
 - **System panel** - RAM breakdown (app, wired, compressor, cached, swap), top processes, anomaly alerts
@@ -27,7 +29,13 @@ For a fully integrated workflow, install the companion skill:
 
 ```sh
 mkdir -p ~/.claude/skills/lazymem
-cp node_modules/lazymem/skill/SKILL.md ~/.claude/skills/lazymem/SKILL.md
+cp ~/.lazymem/skill/SKILL.md ~/.claude/skills/lazymem/SKILL.md
+```
+
+If you installed via Homebrew instead of the curl installer, copy from:
+
+```sh
+cp "$(brew --prefix lazymem)/share/lazymem/skill/SKILL.md" ~/.claude/skills/lazymem/SKILL.md
 ```
 
 Then use `/lazymem` in Claude Code to:
@@ -47,12 +55,22 @@ brew tap JayFarei/tap
 brew install lazymem
 ```
 
-### npm / bun
+### cargo
+
+Install directly from git:
 
 ```sh
-npm install -g lazymem
-# or
-bun install -g lazymem
+cargo install --git https://github.com/JayFarei/lazymem --locked lazymem-rs
+```
+
+This installs the `lazymem` binary from the Rust crate in this repository.
+
+`cargo install` only installs the binary. If you also want the bundled Claude skill assets, use the Homebrew or curl install path instead.
+
+If you are hacking locally instead:
+
+```sh
+cargo install --path src-rust
 ```
 
 ### curl
@@ -61,14 +79,22 @@ bun install -g lazymem
 curl -fsSL https://raw.githubusercontent.com/JayFarei/lazymem/main/install.sh | sh
 ```
 
-### From source
+### From source (Rust)
 
 ```sh
-git clone https://github.com/JayFarei/lazymem.git
-cd lazymem
-bun install
-bun run dev
+cargo build --release --manifest-path src-rust/Cargo.toml
+./src-rust/target/release/lazymem
 ```
+
+## Benchmark
+
+The current OpenTUI vs RatatUI comparison lives under:
+
+- `benchmark/results/latest-head-to-head.md`
+- `benchmark/results/latest-opentui.json`
+- `benchmark/results/latest-ratatui.json`
+
+The benchmark harness and tracked scorecard live under `benchmark/`.
 
 ## Keybindings
 
@@ -87,7 +113,8 @@ bun run dev
 ## Requirements
 
 - macOS (uses `vm_stat`, `sysctl`, `ps` with macOS-specific flags)
-- [Bun](https://bun.sh) >= 1.0
+- Bun only if you are developing or benchmarking the legacy OpenTUI implementation
+- Rust only if you are building the RatatUI binary from source
 
 ## License
 

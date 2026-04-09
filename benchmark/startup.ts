@@ -118,14 +118,16 @@ const METRICS: MetricKey[] = [
   "rssAfterIdleMB",
   "peakRssMB",
 ];
+const BENCHMARK_DIR = import.meta.dir;
+const REPO_ROOT = resolve(BENCHMARK_DIR, "..");
+const OBJECTIVES_PATH = resolve(BENCHMARK_DIR, "objectives.json");
+const RESULTS_DIR = resolve(BENCHMARK_DIR, "results");
 
 async function main() {
-  const repoRoot = resolve(import.meta.dir, "..");
-  const objectives = await Bun.file(resolve(repoRoot, "bench/objectives.json")).json<Objectives>();
+  const objectives = await Bun.file(OBJECTIVES_PATH).json<Objectives>();
   const args = parseArgs(process.argv.slice(2), objectives);
   const benchmarkMode = process.env.LAZYMEM_BENCHMARK_MODE ?? "default";
-  const artifactDir = resolve(repoRoot, "benchmarks/results");
-  await mkdir(artifactDir, { recursive: true });
+  await mkdir(RESULTS_DIR, { recursive: true });
 
   const tempDir = await mkdtemp(join(tmpdir(), "lazymem-bench-"));
   const warmups: RunResult[] = [];
@@ -134,7 +136,7 @@ async function main() {
   try {
     for (let index = 0; index < args.warmupRuns; index += 1) {
       warmups.push(await runOnce({
-        repoRoot,
+        repoRoot: REPO_ROOT,
         idleWaitMs: args.idleWaitMs,
         tempDir,
         label: `warmup-${index + 1}`,
@@ -143,7 +145,7 @@ async function main() {
 
     for (let index = 0; index < args.measuredRuns; index += 1) {
       runs.push(await runOnce({
-        repoRoot,
+        repoRoot: REPO_ROOT,
         idleWaitMs: args.idleWaitMs,
         tempDir,
         label: `run-${index + 1}`,
@@ -159,7 +161,7 @@ async function main() {
 
   const summary = buildSummary({
     benchmarkMode,
-    repoRoot,
+    repoRoot: REPO_ROOT,
     objectives,
     warmupRuns: warmups.length,
     measuredRuns: runs.length,
@@ -172,8 +174,8 @@ async function main() {
   const historyFile = benchmarkMode === "default"
     ? `startup-${timestamp}.json`
     : `startup-${benchmarkMode}-${timestamp}.json`;
-  const latestPath = resolve(artifactDir, latestFile);
-  const historyPath = resolve(artifactDir, historyFile);
+  const latestPath = resolve(RESULTS_DIR, latestFile);
+  const historyPath = resolve(RESULTS_DIR, historyFile);
   const payload = JSON.stringify(summary, null, 2);
 
   await Bun.write(latestPath, payload);

@@ -12,5 +12,5 @@ scripts/captures/
 .claude/
 skills-lock.json
 kb/
-benchmarks/results/
+benchmark/results/
 src-rust/target/

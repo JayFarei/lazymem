@@ -1,5 +1,5 @@
 import { mkdir } from "node:fs/promises";
-import { basename, resolve } from "node:path";
+import { resolve } from "node:path";
 
 type MetricKey =
   | "cliToCoreReadyMs"
@@ -37,39 +37,40 @@ const METRICS: MetricKey[] = [
   "rssAfterIdleMB",
   "peakRssMB",
 ];
+const BENCHMARK_DIR = import.meta.dir;
+const REPO_ROOT = resolve(BENCHMARK_DIR, "..");
+const RESULTS_DIR = resolve(BENCHMARK_DIR, "results");
 
 const VARIANTS: [Variant, Variant] = [
   {
     label: "OpenTUI",
     mode: "opentui",
     bin: "./bin/lazymem",
-    latestPath: "benchmarks/results/latest-opentui.json",
+    latestPath: "results/latest-opentui.json",
   },
   {
     label: "RatatUI",
     mode: "ratatui",
     bin: "./bin/lazymem-rs",
-    latestPath: "benchmarks/results/latest-ratatui.json",
+    latestPath: "results/latest-ratatui.json",
   },
 ];
 
 async function main() {
-  const repoRoot = resolve(import.meta.dir, "..");
   const args = parseArgs(process.argv.slice(2));
-  const outputDir = resolve(repoRoot, "benchmarks/results");
-  await mkdir(outputDir, { recursive: true });
+  await mkdir(RESULTS_DIR, { recursive: true });
 
   for (const variant of VARIANTS) {
-    await runVariant(repoRoot, variant, args);
+    await runVariant(variant, args);
   }
 
   const [base, head] = await Promise.all(
-    VARIANTS.map((variant) => readSummary(resolve(repoRoot, variant.latestPath))),
+    VARIANTS.map((variant) => readSummary(resolve(BENCHMARK_DIR, variant.latestPath))),
   );
 
   const table = buildMarkdownTable(VARIANTS[0], base, VARIANTS[1], head);
-  const latestPath = resolve(outputDir, "latest-head-to-head.md");
-  const historyPath = resolve(outputDir, `head-to-head-${isoTimestamp(new Date())}.md`);
+  const latestPath = resolve(RESULTS_DIR, "latest-head-to-head.md");
+  const historyPath = resolve(RESULTS_DIR, `head-to-head-${isoTimestamp(new Date())}.md`);
   await Bun.write(latestPath, table);
   await Bun.write(historyPath, table);
 
@@ -113,11 +114,10 @@ function parseNumberArg(flag: string, raw: string | undefined): number {
 }
 
 async function runVariant(
-  repoRoot: string,
   variant: Variant,
   args: ReturnType<typeof parseArgs>,
 ) {
-  const command = [process.execPath, "run", "scripts/benchmark-startup.ts"];
+  const command = [process.execPath, "run", "benchmark/startup.ts"];
   if (args.warmups != null) {
     command.push("--warmups", String(args.warmups));
   }
@@ -130,7 +130,7 @@ async function runVariant(
 
   console.log(`==> ${variant.label} (${variant.bin})`);
   const proc = Bun.spawn(command, {
-    cwd: repoRoot,
+    cwd: REPO_ROOT,
     stdout: "inherit",
     stderr: "inherit",
     env: {

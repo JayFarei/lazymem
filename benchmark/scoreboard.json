@@ -3,14 +3,14 @@
   "updatedAt": "2026-04-08T19:57:27Z",
   "notes": [
     "This file is the tracked scorecard for accepted and diagnostic benchmark results.",
-    "Raw benchmark artifacts live under benchmarks/results/ and are ignored by git; promote important results here."
+    "Raw benchmark artifacts live under benchmark/results/ and are ignored by git; promote important results here."
   ],
   "acceptedDefaultBaselines": [
     {
       "label": "campaign-baseline",
       "measuredAt": "2026-04-08T14:50:30Z",
       "commit": "pre-b79b773-working-tree",
-      "source": "benchmarks/results/startup-2026-04-08T14-50-30Z.json",
+      "source": "benchmark/results/startup-2026-04-08T14-50-30Z.json",
       "medians": {
         "cliToCoreReadyMs": 387,
         "cliToFullReadyMs": 2668,
@@ -26,7 +26,7 @@
       "label": "current-head",
       "measuredAt": "2026-04-08T16:57:51Z",
       "commit": "b79b773",
-      "source": "benchmarks/results/startup-2026-04-08T16-57-51Z.json",
+      "source": "benchmark/results/startup-2026-04-08T16-57-51Z.json",
       "medians": {
         "cliToCoreReadyMs": 368,
         "cliToFullReadyMs": 602,
@@ -58,7 +58,7 @@
       "current": {
         "label": "b79b773",
         "commit": "b79b773",
-        "source": "benchmarks/results/startup-2026-04-08T16-57-51Z.json",
+        "source": "benchmark/results/startup-2026-04-08T16-57-51Z.json",
         "medians": {
           "cliToCoreReadyMs": 368,
           "cliToFullReadyMs": 602,
@@ -84,7 +84,7 @@
       "label": "shell-floor",
       "benchmarkMode": "shell",
       "measuredAt": "2026-04-08T15:29:40Z",
-      "source": "benchmarks/results/latest-shell.json",
+      "source": "benchmark/results/latest-shell.json",
       "medians": {
         "cliToCoreReadyMs": 226,
         "cliToFullReadyMs": 226,
@@ -100,7 +100,7 @@
       "label": "system-isolated-no-procs",
       "benchmarkMode": "system-isolated-no-procs",
       "measuredAt": "2026-04-08T16:20:05Z",
-      "source": "benchmarks/results/latest-system-isolated-no-procs.json",
+      "source": "benchmark/results/latest-system-isolated-no-procs.json",
       "medians": {
         "cliToCoreReadyMs": 317,
         "cliToFullReadyMs": 2631,
@@ -113,7 +113,7 @@
       "label": "system-isolated-procs-only",
       "benchmarkMode": "system-isolated-procs-only",
       "measuredAt": "2026-04-08T16:29:35Z",
-      "source": "benchmarks/results/latest-system-isolated-procs-only.json",
+      "source": "benchmark/results/latest-system-isolated-procs-only.json",
       "medians": {
         "cliToCoreReadyMs": 323,
         "cliToFullReadyMs": 2649,
@@ -129,7 +129,7 @@
       "label": "system-isolated-text-summary",
       "benchmarkMode": "system-isolated-text-summary",
       "measuredAt": "2026-04-08T16:30:11Z",
-      "source": "benchmarks/results/latest-system-isolated-text-summary.json",
+      "source": "benchmark/results/latest-system-isolated-text-summary.json",
       "medians": {
         "cliToCoreReadyMs": 312,
         "cliToFullReadyMs": 2494,

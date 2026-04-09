@@ -1,5 +1,6 @@
 {
   "name": "lazymem",
+  "private": true,
   "version": "0.1.1",
   "description": "Terminal UI memory monitor for macOS dev environments",
   "type": "module",
@@ -28,10 +29,10 @@
     "dev": "bun --preload=./node_modules/@opentui/solid/scripts/preload.ts src/index.tsx",
     "start": "bun --preload=./node_modules/@opentui/solid/scripts/preload.ts src/index.tsx",
     "test": "bun test",
-    "benchmark:startup": "bun run scripts/benchmark-startup.ts",
-    "benchmark:startup:quick": "bun run scripts/benchmark-startup.ts --warmups 0 --runs 3 --idle-ms 1500",
-    "benchmark:compare": "bun run scripts/benchmark-compare.ts",
-    "benchmark:head-to-head": "bun run scripts/benchmark-head-to-head.ts"
+    "benchmark:startup": "bun run benchmark/startup.ts",
+    "benchmark:startup:quick": "bun run benchmark/startup.ts --warmups 0 --runs 3 --idle-ms 1500",
+    "benchmark:compare": "bun run benchmark/compare.ts",
+    "benchmark:head-to-head": "bun run benchmark/head-to-head.ts"
   },
   "dependencies": {
     "@opentui/core": "0.1.77",
